@@ -79,17 +79,22 @@ document.addEventListener("DOMContentLoaded", function () {
 // ✅ Display User Name in Navbar & Home Page
 document.addEventListener("DOMContentLoaded", async function () {
     const navbarContainer = document.getElementById("navbar");
+    
     if (navbarContainer) {
         try {
             const response = await fetch("components/navbar.html");
             const navbarHTML = await response.text();
             navbarContainer.innerHTML = navbarHTML;
 
-            // ✅ Update the account name dynamically after navbar is loaded
-            const accountNameEl = document.getElementById("account-name");
-            if (accountNameEl) {
-                accountNameEl.innerText = localStorage.getItem("userName") || "Guest";
-            }
+            // ✅ Wait for the navbar to be inserted, then update the account name
+            setTimeout(() => {
+                const accountNameEl = document.getElementById("account-name");
+                if (accountNameEl) {
+                    accountNameEl.innerText = localStorage.getItem("userName") || "Guest";
+                } else {
+                    console.error("Element #account-name not found.");
+                }
+            }, 100); // Give time for DOM update
         } catch (error) {
             console.error("Error loading navbar:", error);
         }
