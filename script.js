@@ -66,14 +66,18 @@ window.signIn = async function () {
 
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
-    const guestButton = document.getElementById("guest");
-    if (guestButton) {
-        guestButton.addEventListener("click", function () {
-            localStorage.setItem("userName", "Guest");
-            window.location.href = "home.html";
-        });
+    const userInfo = document.getElementById("user-info");
+    if (userInfo) {
+        const userName = localStorage.getItem("userName") || "Guest";
+
+        if (userName === "Guest") {
+            userInfo.innerHTML = `Logged in as: Guest | <a href="index.html">Sign In</a>`;
+        } else {
+            userInfo.innerText = `Logged in as: ${userName}`;
+        }
     }
 });
+
 
 // ✅ Display User Name on Home Page
 if (document.getElementById("user-info")) {
