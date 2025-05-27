@@ -66,23 +66,23 @@ window.signIn = async function () {
 
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
-    const userInfo = document.getElementById("user-info");
-    if (userInfo) {
-        const userName = localStorage.getItem("userName") || "Guest";
-
-        if (userName === "Guest") {
-            userInfo.innerHTML = `Logged in as: Guest | <a href="index.html">Sign In</a>`;
-        } else {
-            userInfo.innerText = `Logged in as: ${userName}`;
-        }
+    const guestButton = document.getElementById("guest");
+    if (guestButton) {
+        guestButton.addEventListener("click", function () {
+            localStorage.setItem("userName", "Guest");
+            window.location.href = "home.html"; // Redirect guest users to home page
+        });
     }
 });
 
-
 // ✅ Display User Name on Home Page
-if (document.getElementById("user-info")) {
-    document.addEventListener("DOMContentLoaded", function () {
-        const userName = localStorage.getItem("userName") || "Guest";
-        document.getElementById("user-info").innerText = `Logged in as: ${userName}`;
-    });
-}
+document.addEventListener("DOMContentLoaded", function () {
+    const userInfo = document.getElementById("user-info");
+    const userName = localStorage.getItem("userName") || "Guest";
+
+    if (userInfo) {
+        userInfo.innerHTML = userName === "Guest"
+            ? `Logged in as: Guest | <a href="index.html">Sign In</a>`
+            : `Logged in as: ${userName}`;
+    }
+});
