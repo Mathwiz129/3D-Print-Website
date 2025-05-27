@@ -60,3 +60,32 @@ button:hover {
     right: 10px;
     font-weight: bold;
 }
+
+.navbar {
+    background-color: #333;
+    padding: 10px;
+    color: white;
+}
+
+.navbar a {
+    color: white;
+    padding: 10px;
+    text-decoration: none;
+}
+
+.account {
+    position: relative;
+    display: inline-block;
+}
+
+.account:hover .dropdown {
+    display: block;
+}
+
+.dropdown {
+    display: none;
+    position: absolute;
+    background: white;
+    color: black;
+    border-radius: 5px;
+}

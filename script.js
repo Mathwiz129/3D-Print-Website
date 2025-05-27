@@ -88,3 +88,17 @@ document.addEventListener("DOMContentLoaded", function () {
             : `Logged in as: ${userName}`;
     }
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+    const accountName = localStorage.getItem("userName") || "Guest";
+    document.getElementById("account-name").innerText = accountName;
+});
+
+// Popup handling
+window.openAccountPopup = function () {
+    document.getElementById("popup").innerHTML = fetch("components/account-popup.html").then(res => res.text());
+};
+
+window.openProviderPopup = function () {
+    document.getElementById("popup").innerHTML = fetch("components/provider-popup.html").then(res => res.text());
+};
