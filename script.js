@@ -26,11 +26,9 @@ window.signUp = async function () {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Store user name in Firestore
         await setDoc(doc(db, "users", user.uid), { name: name, email: email });
 
-        // Redirect to home
-        localStorage.setItem("userName", name); // Store locally for display
+        localStorage.setItem("userName", name);
         window.location.href = "home.html";
     } catch (error) {
         alert(error.message);
