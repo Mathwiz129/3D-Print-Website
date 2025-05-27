@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, fetchSignInMethodsForEmail } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -11,10 +11,13 @@ const firebaseConfig = {
     appId: "1:694635814417:web:11e29a6384928c8fad5bb0"
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// ✅ Log Firebase status for debugging
+console.log("Firebase initialized:", auth, db);
 
 // ✅ Sign-Up Function
 window.signUp = async function () {
@@ -30,7 +33,7 @@ window.signUp = async function () {
         await setDoc(doc(db, "users", user.uid), { name: name, email: email });
 
         localStorage.setItem("userName", name);
-        window.location.href = "home.html";
+        window.location.href = "home.html"; // Redirect to home page
     } catch (error) {
         alert(error.message);
     }
@@ -43,7 +46,7 @@ window.signIn = async function () {
     const errorMessage = document.getElementById("error-message");
 
     try {
-        // Direct login attempt without checking sign-in methods first
+        // Try signing in
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
@@ -61,7 +64,6 @@ window.signIn = async function () {
     }
 };
 
-
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
     const guestButton = document.getElementById("guest");
@@ -75,6 +77,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // ✅ Display User Name on Home Page
 if (document.getElementById("user-info")) {
-    const userName = localStorage.getItem("userName") || "Guest";
-    document.getElementById("user-info").innerText = `Logged in as: ${userName}`;
+    document.addEventListener("DOMContentLoaded", function () {
+        const userName = localStorage.getItem("userName") || "Guest";
+        document.getElementById("user-info").innerText = `Logged in as: ${userName}`;
+    });
 }
