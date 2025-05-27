@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - 3D Print Marketplace</title>
+    <title>Settings - 3D Print Marketplace</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="navbar"></div>
 
-    <p>Explore the marketplace and find 3D print options tailored to your needs!</p>
+    <div class="container">
+        <h2>Account Settings</h2>
+        <button onclick="openAccountPopup()">Account Information</button>
+        <button onclick="openProviderPopup()">Service Provider Info</button>
+    </div>
+
+    <div id="popup"></div>
 
     <script src="script.js" defer></script>
     <script>document.getElementById("navbar").innerHTML = fetch("components/navbar.html").then(res => res.text());</script>
