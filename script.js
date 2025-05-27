@@ -19,7 +19,7 @@ const db = getFirestore(app);
 // ✅ Log Firebase status for debugging
 console.log("Firebase initialized:", auth, db);
 
-// ✅ Sign-Up Function
+// ✅ Sign-Up Function (Stores Name in Firestore)
 window.signUp = async function () {
     const name = document.getElementById("name").value;
     const email = document.getElementById("email").value;
@@ -39,7 +39,7 @@ window.signUp = async function () {
     }
 };
 
-// ✅ Sign-In Function
+// ✅ Sign-In Function (Retrieves Name from Firestore)
 window.signIn = async function () {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
@@ -65,7 +65,6 @@ window.signIn = async function () {
     }
 };
 
-
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
     const guestButton = document.getElementById("guest");
@@ -77,28 +76,47 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
-// ✅ Display User Name on Home Page
-document.addEventListener("DOMContentLoaded", function () {
-    const userInfo = document.getElementById("user-info");
-    const userName = localStorage.getItem("userName") || "Guest";
+// ✅ Display User Name in Navbar & Home Page
+document.addEventListener("DOMContentLoaded", async function () {
+    const navbarContainer = document.getElementById("navbar");
+    if (navbarContainer) {
+        try {
+            const response = await fetch("components/navbar.html");
+            const navbarHTML = await response.text();
+            navbarContainer.innerHTML = navbarHTML;
 
-    if (userInfo) {
-        userInfo.innerHTML = userName === "Guest"
-            ? `Logged in as: Guest | <a href="index.html">Sign In</a>`
-            : `Logged in as: ${userName}`;
+            // ✅ Update the account name dynamically after navbar is loaded
+            const accountNameEl = document.getElementById("account-name");
+            if (accountNameEl) {
+                accountNameEl.innerText = localStorage.getItem("userName") || "Guest";
+            }
+        } catch (error) {
+            console.error("Error loading navbar:", error);
+        }
     }
 });
 
-document.addEventListener("DOMContentLoaded", function () {
-    const accountName = localStorage.getItem("userName") || "Guest";
-    document.getElementById("account-name").innerText = accountName;
-});
-
-// Popup handling
-window.openAccountPopup = function () {
-    document.getElementById("popup").innerHTML = fetch("components/account-popup.html").then(res => res.text());
+// ✅ Popup Handling for Account & Provider Info
+window.openAccountPopup = async function () {
+    const popupContainer = document.getElementById("popup");
+    if (popupContainer) {
+        try {
+            const response = await fetch("components/account-popup.html");
+            popupContainer.innerHTML = await response.text();
+        } catch (error) {
+            console.error("Error loading account popup:", error);
+        }
+    }
 };
 
-window.openProviderPopup = function () {
-    document.getElementById("popup").innerHTML = fetch("components/provider-popup.html").then(res => res.text());
+window.openProviderPopup = async function () {
+    const popupContainer = document.getElementById("popup");
+    if (popupContainer) {
+        try {
+            const response = await fetch("components/provider-popup.html");
+            popupContainer.innerHTML = await response.text();
+        } catch (error) {
+            console.error("Error loading provider popup:", error);
+        }
+    }
 };
