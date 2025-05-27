@@ -46,15 +46,16 @@ window.signIn = async function () {
     const errorMessage = document.getElementById("error-message");
 
     try {
-        // Try signing in
+        // Authenticate user
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Fetch user name from Firestore
+        // ✅ Fetch user's name from Firestore using UID
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            localStorage.setItem("userName", docSnap.data().name);
+            const userName = docSnap.data().name;
+            localStorage.setItem("userName", userName); // Store name in local storage
         }
 
         window.location.href = "home.html";
@@ -63,6 +64,7 @@ window.signIn = async function () {
         errorMessage.classList.remove("hidden");
     }
 };
+
 
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
