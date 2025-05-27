@@ -18,23 +18,25 @@
     <button onclick="googleSignIn()">Sign In with Google</button>
 
     <script type="module">
+        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-auth.js";
 
+        // Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyCGs8p2kkbH2bgIZVSdc37pC7iO9Bh9_kk",
+            authDomain: "d-print-website.firebaseapp.com",
+            projectId: "d-print-website",
+            storageBucket: "d-print-website.appspot.com",
+            messagingSenderId: "694635814417",
+            appId: "1:694635814417:web:11e29a6384928c8fad5bb0"
         };
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
 
-        // Sign-Up with Email
+        // Email/Password Sign-Up
         window.signUp = async function () {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
@@ -46,7 +48,7 @@
             }
         };
 
-        // Sign-In with Email
+        // Email/Password Sign-In
         window.signIn = async function () {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
@@ -58,7 +60,7 @@
             }
         };
 
-        // Sign-In with Google
+        // Google Sign-In
         window.googleSignIn = async function () {
             const provider = new GoogleAuthProvider();
             try {
