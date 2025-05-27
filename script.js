@@ -43,15 +43,7 @@ window.signIn = async function () {
     const errorMessage = document.getElementById("error-message");
 
     try {
-        // Check if email is registered
-        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
-        if (signInMethods.length === 0) {
-            errorMessage.innerHTML = "Email not found. <a href='signup.html'>Sign Up here</a>";
-            errorMessage.classList.remove("hidden");
-            return;
-        }
-
-        // Try signing in
+        // Direct login attempt without checking sign-in methods first
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
@@ -68,6 +60,7 @@ window.signIn = async function () {
         errorMessage.classList.remove("hidden");
     }
 };
+
 
 // ✅ Continue as Guest Function
 document.addEventListener("DOMContentLoaded", function () {
