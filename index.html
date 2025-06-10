@@ -1,27 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - 3D Print Marketplace</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home - 3D Printing Network</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <div id="navbar"></div>
 
-    <div class="container">
-        <h2>Login to Your Account</h2>
-        <input type="email" id="email" placeholder="Enter email">
-        <input type="password" id="password" placeholder="Enter password">
-        <p id="error-message" class="hidden"></p>
+  <!-- Navigation -->
+  <nav>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="apply.html">Apply to Be a Printer</a></li>
+      <li><a href="order.html">Place an Order</a></li>
+    </ul>
+  </nav>
 
-        <button onclick="signIn()">Sign In</button>
-        <button id="guest">Continue as Guest</button>
-        <p class="sign-up-text">Don't have an account? <a href="signup.html">Sign Up</a></p>
+  <!-- Metrics -->
+  <div class="metrics-container">
+    <div class="metric-box">
+      <h2>Printers</h2>
+      <p id="printers">Loading...</p>
     </div>
+    <div class="metric-box">
+      <h2>Total Orders</h2>
+      <p id="orders">Loading...</p>
+    </div>
+  </div>
 
-    <script type="module" src="script.js"></script>
-    <script>document.getElementById("navbar").innerHTML = fetch("components/navbar.html").then(res => res.text());</script>
+  <!-- Main Content -->
+  <main class="page-container">
+    <div class="content-box">
+      <h1 class="highlight">A New Way to Get Things Made</h1>
+      <p>We're building a platform that connects <strong>independent 3D printers and machinists</strong> with customers who need custom parts—quickly, professionally, and directly.</p>
+
+      <div class="info-grid">
+        <div class="info-card">
+          <h3><span class="material-icons">bolt</span> <strong>What We Do</strong></h3>
+          <p>We match customer orders with capable printers based on <strong>part requirements, location, and turnaround time</strong>. The printer ships the part directly to the customer.</p>
+        </div>
+
+        <div class="info-card">
+          <h3><span class="material-icons">engineering</span> <strong>Where We Are</strong></h3>
+          <p>We're in the early stages. Orders and applications are handled with <strong>Google Forms</strong> for now while we build out automation and user accounts.</p>
+        </div>
+
+        <div class="info-card">
+          <h3><span class="material-icons">visibility</span> <strong>What's Coming</strong></h3>
+          <p>Soon you'll see <strong>automated job matching, quoting tools, real-time order tracking</strong>, and printer dashboards to manage your workflow efficiently.</p>
+        </div>
+
+        <div class="info-card">
+          <h3><span class="material-icons">group_add</span> <strong>Get Involved</strong></h3>
+          <p><strong>Makers can apply</strong> to be part of our growing network. <strong>Customers can submit</strong> an order to get started today. You’re early—and that’s awesome.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
