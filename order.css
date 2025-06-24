@@ -1,0 +1,129 @@
+.order-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 60px 20px;
+  min-height: calc(100vh - 64px);
+}
+
+.order-card {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  max-width: 1040px;
+  width: 100%;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.page-title {
+  text-align: center;
+  color: #333;
+  margin-bottom: 40px;
+}
+
+.order-grid {
+  display: flex;
+  gap: 48px; /* Increased horizontal spacing */
+  flex-wrap: wrap;
+}
+
+.viewer-column {
+  flex: 1 1 400px;
+}
+
+#viewer {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: #f8f8f8;
+  border-radius: 12px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.05);
+}
+
+.form-column {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px; /* Space between upload and form */
+  justify-content: flex-start;
+}
+
+/* Upload panel */
+.upload-box {
+  background: #f9f9f9;
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.upload-box:hover {
+  background: #f0f0f0;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+/* Customization panel */
+.customize-box {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+}
+
+.input-card,
+.info-card {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input-card label,
+.info-card span {
+  font-weight: 600;
+  color: #333;
+}
+
+.input-card input,
+.input-card select {
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.info-card div {
+  font-size: 18px;
+  font-weight: bold;
+  color: #222;
+  margin-top: 4px;
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.button-row button {
+  flex: 1;
+  background: #e6642e;
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button-row button:hover {
+  background-color: #c4501e;
+}

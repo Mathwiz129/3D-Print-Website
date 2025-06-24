@@ -4,86 +4,82 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Place an Order</title>
-  <link rel="stylesheet" href="styles.css"/>\
-  <script src="order.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="order.css" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 
-  <!-- Navigation Bar -->
- <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <nav class="main-nav">
+    <div class="nav-left"><a href="index.html" class="logo">OUTPRINT</a></div>
+    <ul class="nav-center">
+      <li><a href="about.html">About</a></li>
+      <li><a href="apply.html">Join</a></li>
+      <li><a href="order.html">Order</a></li>
+    </ul>
+  </nav>
 
-<nav class="main-nav">
-  <div class="nav-left">
-    <a href="index.html" class="logo">OUTPRINT</a>
-  </div>
-  <ul class="nav-center">
-    <li><a href="about.html">About</a></li>
-    <li><a href="apply.html">Join</a></li>
-    <li><a href="order.html">Order</a></li>
-  </ul>
-  <div class="nav-right">
-    <a href="#"><i class="material-icons">search</i></a>
-    <a href="#"><i class="material-icons">account_circle</i></a>
-    <span class="username">name</span>
-  </div>
-</nav>
+  <main class="order-wrapper">
+    <div class="order-card">
+      <h1 class="page-title">Place Order</h1>
 
-  <!-- Main Content -->
-  <main class="page-container">
-    <div class="content-box">
-      <h1 class="highlight">Place an Order</h1>
-
-      <h2 class="section-title">How It Works</h2>
-      <div class="info-grid">
-        <div class="info-card">
-          <h3><span class="material-icons">assignment</span> <strong>Submit Your Order</strong></h3>
-          <p>Provide your 3d files and detailed <strong>part specifications</strong>. Include material preferences, quantity, and any special instructions.</p>
+      <div class="order-grid">
+        <!-- 3D Viewer Column -->
+        <div class="viewer-column">
+          <div id="viewer"></div>
         </div>
-        <div class="info-card">
-          <h3><span class="material-icons">search</span> <strong>Printer Matching</strong></h3>
-          <p>Your request will be sent to <strong>verified 3D printers</strong>, and the best match will be selected based on availability and specifications.</p>
+
+        <!-- Upload & Customization Column -->
+        <div class="form-column">
+          <!-- Upload Panel -->
+          <div id="uploadPanel">
+            <div id="drop-area" class="upload-box">
+              <span class="material-icons upload-icon">cloud_upload</span>
+              <p>Upload STL</p>
+              <input type="file" id="stlInput" accept=".stl" hidden />
+            </div>
+          </div>
+
+          <!-- Customization Panel (initially hidden) -->
+          <div id="customizePanel" class="customize-box" style="display: none;">
+            <form id="costEstimator">
+              <div class="input-card">
+                <label for="material">Material</label>
+                <select id="material" required>
+                  <option value="PLA">PLA</option>
+                  <option value="ABS">ABS</option>
+                  <option value="PETG">PETG</option>
+                </select>
+              </div>
+
+              <div class="input-card">
+                <label for="infill">Infill (%)</label>
+                <input type="number" id="infill" min="0" max="100" value="20" required />
+              </div>
+
+              <div class="info-card">
+                <span>Estimated Weight</span>
+                <div id="weightDisplay">–</div>
+              </div>
+
+              <div class="info-card">
+                <span>Estimated Cost</span>
+                <div id="costDisplay">–</div>
+              </div>
+
+              <div class="button-row">
+                <button type="button" id="reuploadBtn">Upload another file</button>
+              </div>
+            </form>
+          </div>
         </div>
-        <div class="info-card">
-          <h3><span class="material-icons">construction</span> <strong>Manufacturing</strong></h3>
-          <p>Once accepted, the printer will begin production. You'll receive an <strong>estimated completion time</strong> before printing begins.</p>
-        </div>
-        <div class="info-card">
-          <h3><span class="material-icons">local_shipping</span> <strong>Shipping & Tracking</strong></h3>
-          <p>The completed part must be <strong>shipped within three days</strong> of production finishing. Tracking details will be provided upon dispatch.</p>
-        </div>
-        <div class="info-card">
-          <h3><span class="material-icons">payments</span> <strong>Secure Payment Processing</strong></h3>
-          <p>A few days after delivery, <strong>payment will be processed</strong>, covering <strong>material costs and production fees</strong>.</p>
-        </div>
-      </div>
-
-      <h2 class="section-title">Ready to Order?</h2>
-      <div class="form-wrapper">
-        <div class="form-wrapper">
-  <form id="costEstimator">
-    <label for="material">Material:</label>
-    <select id="material" required>
-      <option value="PLA">PLA</option>
-      <option value="ABS">ABS</option>
-      <option value="PETG">PETG</option>
-    </select>
-
-    <label for="infill">Infill Percentage (%):</label>
-    <input type="number" id="infill" min="0" max="100" value="20" required />
-
-    <label for="volume">Part Volume (cm³):</label>
-    <input type="number" id="volume" step="0.1" required />
-
-    <button type="submit">Estimate Cost</button>
-  </form>
-
-  <div id="result" style="margin-top: 1em; font-weight: bold;"></div>
-</div>
-        <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdT4RKW1sgyKAOOEJGqmYV05Ga4YO2elnRWIB9M1H32m5bgNw/viewform?embedded=true" width="100%" height="1200" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
       </div>
     </div>
   </main>
 
+  <script src="order.js"></script>
 </body>
 </html>
