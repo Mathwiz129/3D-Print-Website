@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Place an Order</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="styles.css"/>\
+  <script src="order.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
 </head>
 <body>
@@ -59,6 +60,26 @@
 
       <h2 class="section-title">Ready to Order?</h2>
       <div class="form-wrapper">
+        <div class="form-wrapper">
+  <form id="costEstimator">
+    <label for="material">Material:</label>
+    <select id="material" required>
+      <option value="PLA">PLA</option>
+      <option value="ABS">ABS</option>
+      <option value="PETG">PETG</option>
+    </select>
+
+    <label for="infill">Infill Percentage (%):</label>
+    <input type="number" id="infill" min="0" max="100" value="20" required />
+
+    <label for="volume">Part Volume (cm³):</label>
+    <input type="number" id="volume" step="0.1" required />
+
+    <button type="submit">Estimate Cost</button>
+  </form>
+
+  <div id="result" style="margin-top: 1em; font-weight: bold;"></div>
+</div>
         <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdT4RKW1sgyKAOOEJGqmYV05Ga4YO2elnRWIB9M1H32m5bgNw/viewform?embedded=true" width="100%" height="1200" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
       </div>
     </div>
