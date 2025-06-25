@@ -1,0 +1,245 @@
+/* Global Styles */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #f3f5f6;
+  color: #222;
+}
+
+/* Builder layout */
+.builder {
+  display: flex;
+  padding: 20px;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* Left Column */
+.part-column {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Upload Box */
+.upload-box {
+  background: #f9f9f9;
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+.upload-box:hover {
+  background: #f0f0f0;
+}
+.upload-box .material-icons {
+  font-size: 36px;
+  color: #888;
+  margin-bottom: 4px;
+}
+.upload-box p {
+  color: #444;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Part Card */
+.part-card {
+  display: flex;
+  gap: 16px;
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  font-size: 14px;
+}
+
+/* Viewer Column */
+.col-render {
+  flex: 0 0 150px;
+}
+.viewer {
+  width: 100%;
+  height: 150px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Controls Column */
+.col-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.col-controls .control {
+  display: flex;
+  flex-direction: column;
+}
+.col-controls .control label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #444;
+}
+.col-controls select,
+.col-controls input {
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: white;
+  color: #222;
+  max-width: 120px;
+}
+
+/* Price Column */
+.col-price {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.col-price .control {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  min-width: 100px;
+}
+.col-price .control label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #444;
+}
+.col-price .price {
+  font-size: 18px;
+  font-weight: bold;
+  color: #222;
+}
+.col-price .cost {
+  font-size: 14px;
+  font-weight: 500;
+  color: #444;
+}
+.col-price .control span,
+.col-price .control input {
+  font-size: 13px;
+  color: #222;
+}
+.col-price input {
+  width: 60px;
+  padding: 4px;
+  text-align: right;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: white;
+}
+
+/* Delete Button */
+.delete-btn {
+  cursor: pointer;
+  color: #c0392b;
+  font-size: 28px;
+  align-self: flex-end;
+}
+
+/* Summary Panel (Order Summary Box) */
+.summary-panel {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  min-width: 260px;
+  position: sticky;
+  top: 20px;
+  color: #444;
+}
+.summary-panel h2 {
+  margin-top: 0;
+  font-size: 18px;
+  color: #444;
+}
+#summaryList {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.summary-footer {
+  margin-top: 16px;
+}
+.summary-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  font-weight: bold;
+  color: #222;
+}
+
+/* Delete Confirmation Modal */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 300px;
+  text-align: center;
+  color: #222;
+}
+.modal-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.modal-card p {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.modal-actions button {
+  padding: 8px 14px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.modal-actions .danger {
+  background: #e74c3c;
+  color: white;
+}
+
+/* Flash animation on update */
+.update-flash {
+  animation: flash 0.5s ease-out;
+}
+@keyframes flash {
+  0% {
+    background-color: #fff3cd;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
