@@ -1,13 +1,51 @@
 document.addEventListener("DOMContentLoaded", () => {
   let currentId = 0;
-  const density = { PLA: 1.24, ABS: 1.04, PETG: 1.27 };
+  let materials = [];
+  let colors = [];
   let deleteTarget = null;
+
+  // API base URL - update this to your Render.com URL
+  const API_BASE_URL = 'https://threed-print-website.onrender.com';
 
   const uploadBox = document.getElementById("uploadBox");
   const stlInput = document.getElementById("stlInput");
   const partsArea = document.getElementById("partsArea");
   const summaryList = document.getElementById("summaryList");
   const summaryTotal = document.getElementById("summaryTotal");
+
+  // Load materials and colors from backend
+  async function loadConfiguration() {
+    try {
+      const [materialsResponse, colorsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/materials`),
+        fetch(`${API_BASE_URL}/admin/colors`)
+      ]);
+      
+      const materialsData = await materialsResponse.json();
+      const colorsData = await colorsResponse.json();
+      
+      materials = materialsData.materials || [];
+      colors = colorsData.colors || [];
+    } catch (error) {
+      console.error('Failed to load configuration:', error);
+      // Fallback to default values
+      materials = [
+        { name: 'PLA', pricePerGram: 0.05, density: 1.24 },
+        { name: 'ABS', pricePerGram: 0.07, density: 1.04 },
+        { name: 'PETG', pricePerGram: 0.06, density: 1.27 }
+      ];
+      colors = [
+        { name: 'Red', value: '#ff3333', multiplier: 1.0 },
+        { name: 'Blue', value: '#1565c0', multiplier: 1.0 },
+        { name: 'Green', value: '#43a047', multiplier: 1.0 },
+        { name: 'Black', value: '#222222', multiplier: 1.0 },
+        { name: 'White', value: '#f5f5f5', multiplier: 1.0 }
+      ];
+    }
+  }
+
+  // Initialize configuration
+  loadConfiguration();
 
   // Modal event listeners for delete confirmation
   document.getElementById("cancelDelete").addEventListener("click", () => {
@@ -42,10 +80,18 @@ document.addEventListener("DOMContentLoaded", () => {
     card.className = "part-card";
     card.dataset.id = id;
 
-    // New layout:
-    // Left Column (.col-render): 3D viewer
-    // Middle Column (.col-controls): Material, Color, and Infill input
-    // Right Column (.col-price): Quantity, Price per Part, Total, and Delete button.
+    // Generate material options
+    const materialOptions = materials.map(material => 
+      `<option value="${material.name}">${material.name}</option>`
+    ).join('');
+
+    // Generate color options
+    const colorOptions = colors.map(color => 
+      `<option value="${color.value}" data-color="${color.value}">
+        <span class="color-dot" style="background:${color.value}"></span>${color.name}
+      </option>`
+    ).join('');
+
     card.innerHTML = `
       <div class="col-render">
         <div class="viewer" id="${id}-viewer"></div>
@@ -53,19 +99,16 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="col-controls">
         <div class="control">
           <label>Material</label>
-          <select class="material">
-            <option value="PLA">PLA</option>
-            <option value="ABS">ABS</option>
-            <option value="PETG">PETG</option>
+          <select class="material required">
+            <option value="">Select Material</option>
+            ${materialOptions}
           </select>
         </div>
         <div class="control">
           <label>Color</label>
-          <select class="color">
-            <option value="default">Default</option>
-            <option value="red">Red</option>
-            <option value="blue">Blue</option>
-            <option value="green">Green</option>
+          <select class="color required-color">
+            <option value="" data-color="#ff3333"><span class="color-dot" style="background:#ff3333"></span>Select Color</option>
+            ${colorOptions}
           </select>
         </div>
         <div class="control">
@@ -98,25 +141,51 @@ document.addEventListener("DOMContentLoaded", () => {
     card.querySelector(".delete-btn").addEventListener("click", () => confirmDelete(card));
 
     // Initialize the Three.js viewer for this part
-    renderViewer(file, document.getElementById(`${id}-viewer`), (volume) => {
+    renderViewer(file, document.getElementById(`${id}-viewer`), (volume, mesh) => {
       card.dataset.volume = volume;
+      card.mesh = mesh; // Store mesh reference as property
       updateCard(card);
     });
 
     // Recalculate whenever any control changes
     card.querySelectorAll("select, input").forEach((input) => 
-      input.addEventListener("input", () => updateCard(card))
+      input.addEventListener("input", () => {
+        updateCard(card);
+        updateMeshColor(card); // Update mesh color when color changes
+      })
     );
+
+    const colorSelect = card.querySelector('.color');
+    colorSelect.addEventListener('change', function() {
+      if (!this.value) {
+        this.classList.add('required-color');
+      } else {
+        this.classList.remove('required-color');
+      }
+      updateMeshColor(card);
+    });
+    if (!colorSelect.value) colorSelect.classList.add('required-color');
+
+    const materialSelect = card.querySelector('.material');
+    materialSelect.addEventListener('change', function() {
+      if (!this.value) {
+        this.classList.add('required');
+      } else {
+        this.classList.remove('required');
+      }
+    });
+    if (!materialSelect.value) materialSelect.classList.add('required');
   }
 
   // Render the STL file into a Three.js viewer within a given container
   function renderViewer(file, container, cb) {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-    camera.position.set(0, 40, 80);
+    camera.position.set(0, 100, 200);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setClearColor(0xf0f0f0); // Light gray background
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
@@ -125,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
     light.position.set(0, 1, 1).normalize();
     scene.add(light);
     scene.add(new THREE.AmbientLight(0x888888));
-    scene.add(new THREE.GridHelper(200, 20, "#aaa", "#ccc"));
+    scene.add(new THREE.GridHelper(200, 20, "#666666", "#888888")); // Darker gray grid lines
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -149,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
       scene.add(mesh);
 
       const volume = computeVolume(geometry);
-      cb(volume);
+      cb(volume, mesh);
 
       animate();
     };
@@ -181,15 +250,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update the cost information on a part card using an API call
   function updateCard(card) {
     const material = card.querySelector(".material").value;
+    const color = card.querySelector(".color").value;
     const infill = parseFloat(card.querySelector(".infill").value) || 0;
     const qty = parseInt(card.querySelector(".qty").value) || 1;
     const volume = parseFloat(card.dataset.volume || 0);
 
-    // Optional: you can use card.querySelector(".color").value if color affects cost.
-    fetch("https://threed-print-website.onrender.com/calculate", {
+    if (!material || !color || volume === 0) {
+      card.querySelector(".price").textContent = "$0.00";
+      card.querySelector(".cost").textContent = "$0.00";
+      card.dataset.cost = 0;
+      updateSummary();
+      return;
+    }
+
+    fetch(`${API_BASE_URL}/calculate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ material, infill, volume })
+      body: JSON.stringify({ material, color, infill, volume })
     })
       .then(r => r.json())
       .then(data => {
@@ -245,5 +322,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function confirmDelete(card) {
     deleteTarget = card;
     document.getElementById("confirmModal").style.display = "flex";
+  }
+
+  // Update mesh color when color selection changes
+  function updateMeshColor(card) {
+    const colorValue = card.querySelector('.color').value;
+    const mesh = card.mesh;
+    if (mesh && mesh.material && colorValue) {
+      mesh.material.color.set(colorValue);
+    }
   }
 });
