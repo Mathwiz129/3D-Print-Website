@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Account - 3D Printing Network</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="auth.css" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Navigation Placeholder -->
+  <div id="nav-placeholder"></div>
+
+  <!-- Main Content -->
+  <main class="page-container">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1 class="highlight">My Account</h1>
+          <p>Manage your profile and settings</p>
+        </div>
+
+        <div id="accountContent">
+          <!-- This will be populated by JavaScript -->
+          <div class="loading-message">
+            <span class="material-icons">hourglass_empty</span>
+            Loading account information...
+          </div>
+        </div>
+
+        <div class="auth-divider">
+          <span>or</span>
+        </div>
+
+        <div class="auth-footer">
+          <p><a href="#" onclick="logout()" class="logout-link">Sign Out</a></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script src="nav.js"></script>
+  <script src="account.js"></script>
+</body>
+</html> 
