@@ -12,9 +12,12 @@
   border-radius: 15px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
   padding: 40px;
+  max-width: 900px;
+  min-width: 400px;
   width: 100%;
-  max-width: 600px;
+  margin: 40px auto;
   text-align: center;
+  display: block;
 }
 
 .auth-header {
@@ -290,6 +293,14 @@
   
   .info-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .auth-card {
+    max-width: 98vw;
+    padding: 30px 10px;
+    margin: 10px auto;
   }
 }
 

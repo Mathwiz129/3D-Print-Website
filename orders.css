@@ -373,8 +373,8 @@ body {
 }
 
 .material.required {
-  border: 2px solid #ff3333 !important;
-  box-shadow: 0 0 0 2px #ffcccc;
+  border: 1.5px solid #ff3333 !important;
+  box-shadow: 0 0 0 2px #ffeaea;
 }
 .material {
   border: 1px solid #ccc;

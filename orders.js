@@ -1,11 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   let currentId = 0;
   let materials = [];
-  let colors = [];
   let deleteTarget = null;
-
-  // API base URL - update this to your Render.com URL
-  const API_BASE_URL = 'https://threed-print-website.onrender.com';
 
   const uploadBox = document.getElementById("uploadBox");
   const stlInput = document.getElementById("stlInput");
@@ -13,39 +9,44 @@ document.addEventListener("DOMContentLoaded", () => {
   const summaryList = document.getElementById("summaryList");
   const summaryTotal = document.getElementById("summaryTotal");
 
-  // Load materials and colors from backend
+  // Load materials from Firestore
   async function loadConfiguration() {
     try {
-      const [materialsResponse, colorsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/materials`),
-        fetch(`${API_BASE_URL}/admin/colors`)
-      ]);
-      
-      const materialsData = await materialsResponse.json();
-      const colorsData = await colorsResponse.json();
-      
-      materials = materialsData.materials || [];
-      colors = colorsData.colors || [];
+      materials = await window.MaterialsFirestore.getMaterialsFromFirestore();
     } catch (error) {
       console.error('Failed to load configuration:', error);
-      // Fallback to default values
-      materials = [
-        { name: 'PLA', pricePerGram: 0.05, density: 1.24 },
-        { name: 'ABS', pricePerGram: 0.07, density: 1.04 },
-        { name: 'PETG', pricePerGram: 0.06, density: 1.27 }
-      ];
-      colors = [
-        { name: 'Red', value: '#ff3333', multiplier: 1.0 },
-        { name: 'Blue', value: '#1565c0', multiplier: 1.0 },
-        { name: 'Green', value: '#43a047', multiplier: 1.0 },
-        { name: 'Black', value: '#222222', multiplier: 1.0 },
-        { name: 'White', value: '#f5f5f5', multiplier: 1.0 }
-      ];
+      materials = [];
     }
   }
 
   // Initialize configuration
-  loadConfiguration();
+  loadConfiguration().then(() => {
+    // You can enable/disable upload UI here if needed
+  });
+
+  // Helper: get unique material names
+  function getUniqueMaterialNames() {
+    const names = materials.map(m => m.name);
+    return [...new Set(names)];
+  }
+
+  // Helper: get all colors for a material name
+  function getColorsForMaterial(materialName) {
+    // Find all materials with this name, collect all their colors
+    const colorMap = {};
+    materials.filter(m => m.name === materialName).forEach(m => {
+      (m.colors || []).forEach(c => {
+        colorMap[c.hex] = c.name; // Use hex as key to avoid duplicates
+      });
+    });
+    // Return array of { name, hex }
+    return Object.entries(colorMap).map(([hex, name]) => ({ name, hex }));
+  }
+
+  // Helper: get material object by name and color hex
+  function getMaterialByNameAndColor(name, colorHex) {
+    return materials.find(m => m.name === name && (m.colors || []).some(c => c.hex === colorHex));
+  }
 
   // Modal event listeners for delete confirmation
   document.getElementById("cancelDelete").addEventListener("click", () => {
@@ -80,62 +81,139 @@ document.addEventListener("DOMContentLoaded", () => {
     card.className = "part-card";
     card.dataset.id = id;
 
-    // Generate material options
-    const materialOptions = materials.map(material => 
-      `<option value="${material.name}">${material.name}</option>`
-    ).join('');
+    // Default part name is the file name
+    let partName = file.name || "Part";
 
-    // Generate color options
-    const colorOptions = colors.map(color => 
-      `<option value="${color.value}" data-color="${color.value}">
-        <span class="color-dot" style="background:${color.value}"></span>${color.name}
-      </option>`
+    // Extract base name and extension
+    let partBaseName = partName.replace(/\.stl$/i, '');
+    const partExt = '.stl';
+
+    // Generate material options (unique names)
+    const materialOptions = getUniqueMaterialNames().map(name => 
+      `<option value="${name}">${name}</option>`
     ).join('');
 
     card.innerHTML = `
-      <div class="col-render">
-        <div class="viewer" id="${id}-viewer"></div>
-      </div>
-      <div class="col-controls">
-        <div class="control">
-          <label>Material</label>
-          <select class="material required">
-            <option value="">Select Material</option>
-            ${materialOptions}
-          </select>
+      <div class="part-card-row" style="display:grid; grid-template-columns:auto 260px 1fr auto; align-items:center; gap:24px; min-height:150px; width:100%;">
+        <div class="col-render-name" style="display:flex; flex-direction:column; align-items:center; min-width:170px; height:100%; justify-content:center;">
+          <h4 class="part-name" tabindex="0" style="cursor:pointer; color:#222; font-size:1.1em; font-weight:bold; margin:0 0 6px 0; padding:0; text-align:center;">${partName}</h4>
+          <div class="viewer" id="${id}-viewer" style="width:140px; height:140px; background:#fafafa; border-radius:10px;"></div>
         </div>
-        <div class="control">
-          <label>Color</label>
-          <select class="color required-color">
-            <option value="" data-color="#ff3333"><span class="color-dot" style="background:#ff3333"></span>Select Color</option>
-            ${colorOptions}
-          </select>
+        <div class="col-controls" style="display:flex; flex-direction:column; gap:10px; align-items:flex-start; min-width:180px; width:180px;">
+          <div class="control" style="display:flex; flex-direction:column; align-items:flex-start; width:100%;">
+            <label style="font-size:15px; color:#888; margin-bottom:2px;">Material</label>
+            <select class="material required" style="width:100%;">
+              <option value="">Select Material</option>
+              ${materialOptions}
+            </select>
+          </div>
+          <div class="control" style="display:flex; flex-direction:column; align-items:flex-start; width:100%;">
+            <label style="font-size:15px; color:#888; margin-bottom:2px;">Color</label>
+            <select class="color required-color" style="width:100%;">
+              <option value="" data-color="">Select Color</option>
+            </select>
+          </div>
+          <div class="control" style="display:flex; flex-direction:column; align-items:flex-start; width:100%;">
+            <label style="font-size:15px; color:#888; margin-bottom:2px;">Infill (%)</label>
+            <input type="number" class="infill" value="20" min="0" max="100" style="width:100%;" />
+          </div>
+          <div class="control" style="display:flex; flex-direction:column; align-items:flex-start; width:100%;">
+            <label style="font-size:15px; color:#888; margin-bottom:2px;">Quantity</label>
+            <input type="number" class="qty" value="1" min="1" style="width:100%; text-align:center; font-size:1em; padding:2px 0;" />
+          </div>
         </div>
-        <div class="control">
-          <label>Infill (%)</label>
-          <input type="number" class="infill" value="20" min="0" max="100" />
-        </div>
-      </div>
-      <div class="col-price">
-        <div class="control">
-          <label>Quantity</label>
-          <input type="number" class="qty" value="1" min="1" />
-        </div>
-        <div class="control">
-          <label>Price per Part</label>
-          <span class="price">$0.00</span>
-        </div>
-        <div class="control">
-          <label>Total</label>
-          <span class="cost">$0.00</span>
-        </div>
-        <div class="control">
-          <span class="material-icons delete-btn">delete</span>
+        <div class="col-price" style="display:flex; flex-direction:column; align-items:flex-end; justify-content:center; min-width:90px; gap:8px; text-align:right; height:140px;">
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span style="font-size:15px; color:#888;">$/per</span>
+            <span class="price" style="font-weight:bold; font-size:1.1em; color:#e6642e;">$0.00</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span style="font-size:15px; color:#888;">total</span>
+            <span class="cost" style="font-weight:bold; font-size:1.1em; color:#e6642e;">$0.00</span>
+          </div>
+          <span class="material-icons delete-btn" style="color:#e6642e; cursor:pointer; margin-top:8px;">delete</span>
         </div>
       </div>
     `;
 
     partsArea.appendChild(card);
+
+    // --- Part name editing logic ---
+    function makePartNameEditable(elem) {
+      elem.onclick = function(e) {
+        e.stopPropagation();
+        startEditPartName(elem);
+      };
+      elem.onkeydown = function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          startEditPartName(elem);
+        }
+      };
+      elem.style.cursor = 'pointer';
+    }
+    let partNameElem = card.querySelector('.part-name');
+    makePartNameEditable(partNameElem);
+    function startEditPartName(currentElem) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = partBaseName;
+      input.className = 'edit-part-name-input';
+      input.style.fontSize = '1.1em';
+      input.style.fontWeight = 'bold';
+      input.style.width = '90%';
+      input.style.margin = '0 0 6px 4px';
+      input.style.color = '#222';
+      input.style.background = '#fff';
+      input.style.border = '1px solid #bbb';
+      input.style.borderRadius = '4px';
+      input.style.padding = '4px 8px';
+      input.style.textAlign = 'left';
+      // Add .stl extension visually next to the input
+      const extSpan = document.createElement('span');
+      extSpan.textContent = partExt;
+      extSpan.style.marginLeft = '4px';
+      extSpan.style.color = '#888';
+      extSpan.style.fontWeight = 'normal';
+      extSpan.style.fontSize = '1.1em';
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'flex';
+      wrapper.style.alignItems = 'center';
+      wrapper.appendChild(input);
+      wrapper.appendChild(extSpan);
+      currentElem.replaceWith(wrapper);
+      input.focus();
+      input.select();
+      let finished = false;
+      function finishEditPartName() {
+        if (finished) return;
+        finished = true;
+        partBaseName = input.value.trim() || 'Part';
+        partName = partBaseName + partExt;
+        const newElem = document.createElement('h4');
+        newElem.className = 'part-name';
+        newElem.tabIndex = 0;
+        newElem.textContent = partName;
+        newElem.style.cursor = 'pointer';
+        newElem.style.color = '#222';
+        newElem.style.fontSize = '1.1em';
+        newElem.style.fontWeight = 'bold';
+        newElem.style.margin = '0 0 6px 4px';
+        newElem.style.padding = '0';
+        newElem.style.textAlign = 'left';
+        wrapper.replaceWith(newElem);
+        makePartNameEditable(newElem); // Always re-enable editing on the new element
+        partNameElem = newElem; // Update reference for future edits
+        updateSummary();
+      }
+      input.addEventListener('blur', finishEditPartName);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          finishEditPartName();
+        }
+      });
+    }
+    // --- End part name editing logic ---
 
     // Set up delete action for this card
     card.querySelector(".delete-btn").addEventListener("click", () => confirmDelete(card));
@@ -147,15 +225,25 @@ document.addEventListener("DOMContentLoaded", () => {
       updateCard(card);
     });
 
-    // Recalculate whenever any control changes
-    card.querySelectorAll("select, input").forEach((input) => 
-      input.addEventListener("input", () => {
-        updateCard(card);
-        updateMeshColor(card); // Update mesh color when color changes
-      })
-    );
-
+    // Material and color dropdowns
+    const materialSelect = card.querySelector('.material');
     const colorSelect = card.querySelector('.color');
+
+    // When material changes, update color options
+    materialSelect.addEventListener('change', function() {
+      const selectedMaterial = this.value;
+      // Update color dropdown
+      const colors = getColorsForMaterial(selectedMaterial);
+      colorSelect.innerHTML = '<option value="" data-color="">Select Color</option>' +
+        colors.map(c => `<option value="${c.hex}" data-color="${c.hex}"><span class="color-dot" style="background:${c.hex}"></span>${c.name}</option>`).join('');
+      // Reset color selection
+      colorSelect.value = '';
+      colorSelect.classList.add('required-color');
+      updateCard(card);
+      updateMeshColor(card);
+    });
+
+    // When color changes, update mesh color
     colorSelect.addEventListener('change', function() {
       if (!this.value) {
         this.classList.add('required-color');
@@ -163,17 +251,18 @@ document.addEventListener("DOMContentLoaded", () => {
         this.classList.remove('required-color');
       }
       updateMeshColor(card);
+      updateCard(card);
     });
-    if (!colorSelect.value) colorSelect.classList.add('required-color');
 
-    const materialSelect = card.querySelector('.material');
-    materialSelect.addEventListener('change', function() {
-      if (!this.value) {
-        this.classList.add('required');
-      } else {
-        this.classList.remove('required');
-      }
-    });
+    // Recalculate whenever any control changes
+    card.querySelectorAll("select, input").forEach((input) => 
+      input.addEventListener("input", () => {
+        updateCard(card);
+        if (input.classList.contains('color')) updateMeshColor(card);
+      })
+    );
+
+    if (!colorSelect.value) colorSelect.classList.add('required-color');
     if (!materialSelect.value) materialSelect.classList.add('required');
   }
 
@@ -247,15 +336,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return Math.abs(vol) / 1000;
   }
 
-  // Update the cost information on a part card using an API call
+  // Update the cost information on a part card using Firestore material data
   function updateCard(card) {
-    const material = card.querySelector(".material").value;
-    const color = card.querySelector(".color").value;
+    const materialName = card.querySelector(".material").value;
+    const colorHex = card.querySelector(".color").value;
     const infill = parseFloat(card.querySelector(".infill").value) || 0;
     const qty = parseInt(card.querySelector(".qty").value) || 1;
     const volume = parseFloat(card.dataset.volume || 0);
 
-    if (!material || !color || volume === 0) {
+    if (!materialName || !colorHex || volume === 0) {
       card.querySelector(".price").textContent = "$0.00";
       card.querySelector(".cost").textContent = "$0.00";
       card.dataset.cost = 0;
@@ -263,32 +352,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    fetch(`${API_BASE_URL}/calculate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ material, color, infill, volume })
-    })
-      .then(r => r.json())
-      .then(data => {
-        const unit = data.cost || 0;
-        const priceElem = card.querySelector(".price");
-        const costElem = card.querySelector(".cost");
-        priceElem.textContent = `$${unit.toFixed(2)}`;
-        const total = unit * qty;
-        costElem.textContent = `$${total.toFixed(2)}`;
-        card.dataset.cost = total;
-        updateSummary();
+    // Find the material object by name and color
+    const materialObj = getMaterialByNameAndColor(materialName, colorHex);
+    if (!materialObj) {
+      card.querySelector(".price").textContent = "$0.00";
+      card.querySelector(".cost").textContent = "$0.00";
+      card.dataset.cost = 0;
+      updateSummary();
+      return;
+    }
 
-        // Trigger a flash effect for visual update
-        flashUpdate(priceElem);
-        flashUpdate(costElem);
-      })
-      .catch(() => {
-        card.querySelector(".price").textContent = "–";
-        card.querySelector(".cost").textContent = "–";
-        card.dataset.cost = 0;
-        updateSummary();
-      });
+    // Calculate price: grams = volume * infill * density
+    const density = parseFloat(materialObj.density) || 1.0;
+    const pricePerGram = parseFloat(materialObj.price) || 0.05;
+    const grams = volume * (infill / 100) * density;
+    const unit = grams * pricePerGram;
+    const priceElem = card.querySelector(".price");
+    const costElem = card.querySelector(".cost");
+    priceElem.textContent = `$${unit.toFixed(2)}`;
+    const total = unit * qty;
+    costElem.textContent = `$${total.toFixed(2)}`;
+    card.dataset.cost = total;
+    updateSummary();
+    flashUpdate(priceElem);
+    flashUpdate(costElem);
   }
 
   // Simple function to add a CSS flash class and remove it after a short delay

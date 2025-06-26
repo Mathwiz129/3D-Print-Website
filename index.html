@@ -12,50 +12,75 @@
   <!-- Navigation Placeholder -->
   <div id="nav-placeholder"></div>
 
-  <!-- Metrics -->
-  <div class="metrics-container">
-    <div class="metric-box">
-      <h2>Printers</h2>
-      <p id="printers">Loading...</p>
-    </div>
-    <div class="metric-box">
-      <h2>Total Orders</h2>
-      <p id="orders">Loading...</p>
-    </div>
-  </div>
-
-  <!-- Main Content -->
-  <main class="page-container">
-    <div class="content-box">
-      <h1 class="highlight">A New Way to Get Things Made</h1>
-      <p>We're building a platform that connects <strong>independent 3D printers and machinists</strong> with customers who need custom parts—quickly, professionally, and directly.</p>
-
-      <div class="info-grid">
-        <div class="info-card">
-          <h3><span class="material-icons">bolt</span> <strong>What We Do</strong></h3>
-          <p>We match customer orders with capable printers based on <strong>part requirements, location, and turnaround time</strong>. The printer ships the part directly to the customer.</p>
-        </div>
-
-        <div class="info-card">
-          <h3><span class="material-icons">engineering</span> <strong>Where We Are</strong></h3>
-          <p>We're in the early stages. Orders and applications are handled with <strong>Google Forms</strong> for now while we build out automation and user accounts.</p>
-        </div>
-
-        <div class="info-card">
-          <h3><span class="material-icons">visibility</span> <strong>What's Coming</strong></h3>
-          <p>Soon you'll see <strong>automated job matching, quoting tools, real-time order tracking</strong>, and printer dashboards to manage your workflow efficiently.</p>
-        </div>
-
-        <div class="info-card">
-          <h3><span class="material-icons">group_add</span> <strong>Get Involved</strong></h3>
-          <p><strong>Makers can apply</strong> to be part of our growing network. <strong>Customers can submit</strong> an order to get started today. You're early—and that's awesome.</p>
-        </div>
+  <!-- Hero Section (no image) -->
+  <section class="hero-section clean-hero">
+    <div class="hero-content">
+      <h1 class="hero-title">On-Demand 3D Printing, Nationwide</h1>
+      <p class="hero-subtitle">Custom parts, prototypes, and production runs—delivered by a trusted network of makers.</p>
+      <div class="hero-cta">
+        <a href="orders.html" class="cta-button">Start an Order</a>
+        <a href="apply.html" class="cta-button">Become a Printer</a>
       </div>
     </div>
-  </main>
+  </section>
+
+  <!-- Metrics (Simple, Prominent) -->
+  <section class="metrics-bar">
+    <div class="metrics-bar-inner">
+      <div class="metric-item"><span class="metric-number" id="printers">--</span> Printers</div>
+      <div class="metric-separator"></div>
+      <div class="metric-item"><span class="metric-number" id="orders">--</span> Orders Fulfilled</div>
+    </div>
+  </section>
+
+  <!-- How It Works (Horizontal Stepper) -->
+  <section class="howworks-section">
+    <h2 class="howworks-title">How It Works</h2>
+    <div class="howworks-steps">
+      <div class="howworks-step">
+        <span class="material-icons howworks-icon">upload_file</span>
+        <div class="howworks-label">Upload Your 3D Model</div>
+        <div class="howworks-desc">Send your STL or 3D file to get started.</div>
+      </div>
+      <div class="howworks-arrow"><span class="material-icons">arrow_forward</span></div>
+      <div class="howworks-step">
+        <span class="material-icons howworks-icon">precision_manufacturing</span>
+        <div class="howworks-label">A Maker Prints It</div>
+        <div class="howworks-desc">We match your order to a vetted local printer.</div>
+      </div>
+      <div class="howworks-arrow"><span class="material-icons">arrow_forward</span></div>
+      <div class="howworks-step">
+        <span class="material-icons howworks-icon">local_shipping</span>
+        <div class="howworks-label">Shipped to You</div>
+        <div class="howworks-desc">Your part is shipped directly to your door.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Make Money as a Printer Section -->
+  <section class="printer-cta-section">
+    <div class="printer-cta-inner">
+      <span class="material-icons printer-cta-icon">attach_money</span>
+      <h2>Make Money as a Printer</h2>
+      <p>Join Outprint and earn by printing parts for customers nationwide. Set your own schedule, choose your jobs, and get paid for your expertise.</p>
+      <a href="apply.html" class="cta-button">Become a Maker</a>
+    </div>
+  </section>
+
+  <!-- Transparent Pricing Section -->
+  <section class="pricing-section">
+    <h2 class="pricing-title">Transparent Pricing</h2>
+    <p class="pricing-desc">See exactly what you'll pay. Prices are per gram and update as new materials are added.</p>
+    <div id="materials-table-container"></div>
+  </section>
+
+  <!-- Footer -->
+  <div id="footer-placeholder"></div>
 
   <script type="module" src="firebase-config.js"></script>
   <script src="nav.js"></script>
   <script src="script.js"></script>
+  <script src="materials.js"></script>
+  <script src="footer.js"></script>
 </body>
 </html>
