@@ -1,11 +1,12 @@
 # Use an official Python base image
 FROM ubuntu:22.04
 
-# Install Python, pip, MeshLab, and all required X11/Qt libraries for headless operation
+# Install Python, pip, MeshLab, all required X11/Qt libraries, and Mesa OpenGL for headless operation
 RUN apt-get update && \
     apt-get install -y python3 python3-pip meshlab git \
     libxkbcommon-x11-0 libxcb-xinerama0 libglu1-mesa xvfb \
-    libxrender1 libsm6 libxext6 && \
+    libxrender1 libsm6 libxext6 \
+    libgl1-mesa-glx libgl1-mesa-dri && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set work directory

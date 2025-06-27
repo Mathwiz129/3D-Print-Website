@@ -117,6 +117,8 @@ def calculate_volume_with_meshlab(stl_file_path):
         
         # Set Qt to use offscreen platform for headless operation
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        # Force OpenGL to use software rendering
+        os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
         # Run MeshLab command (try without xvfb-run for maximum compatibility)
         cmd = [
             'meshlabserver',  # MeshLab command line tool
