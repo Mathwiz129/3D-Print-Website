@@ -10,15 +10,31 @@ from datetime import datetime
 import subprocess
 import tempfile
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
 
 # Initialize Firebase Admin SDK (if not already done)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("outprint-3d-printing-firebase-adminsdk-fbsvc-bee53169f9.json")
-    firebase_admin.initialize_app(cred)
-
-db = firestore.client()
+    try:
+        # Try to use environment variable (for Render deployment)
+        import json
+        firebase_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+        if firebase_creds:
+            # Parse the JSON string from environment variable
+            cred_dict = json.loads(firebase_creds)
+            cred = credentials.Certificate(cred_dict)
+        else:
+            # Fall back to file (for local development)
+            cred = credentials.Certificate("outprint-3d-printing-firebase-adminsdk-fbsvc-bee53169f9.json")
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        print(f"Firebase initialization error: {e}")
+        # Continue without Firebase for now
+        db = None
+    else:
+        db = firestore.client()
+else:
+    db = firestore.client()
 
 # Serve main pages
 @app.route('/')
@@ -134,6 +150,9 @@ def calculate_cost():
             return jsonify({'error': 'Missing material or volume'}), 400
 
         # Get material data from Firestore
+        if db is None:
+            return jsonify({'error': 'Database not available'}), 500
+            
         materials_ref = db.collection('materials')
         material_docs = materials_ref.where('name', '==', material).limit(1).stream()
         
@@ -230,6 +249,9 @@ def submit_printer_application():
         data['status'] = 'pending'
         
         # Save to Firestore
+        if db is None:
+            return jsonify({'error': 'Database not available'}), 500
+            
         doc_ref = db.collection('printer-applications').add(data)
         
         # Send email notification
@@ -298,4 +320,4 @@ def send_application_email(email, name):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
