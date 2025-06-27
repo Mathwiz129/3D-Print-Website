@@ -10,6 +10,8 @@ from datetime import datetime
 import subprocess
 import tempfile
 import werkzeug
+import struct
+import math
 
 app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
@@ -97,15 +99,67 @@ def health_check():
         'timestamp': datetime.now().isoformat()
     })
 
+def calculate_volume_from_stl(stl_file_path):
+    """Calculate volume by parsing STL file directly - more reliable than MeshLab in headless environments"""
+    try:
+        with open(stl_file_path, 'rb') as f:
+            # Read header (80 bytes)
+            header = f.read(80)
+            
+            # Read triangle count (4 bytes)
+            triangle_count_bytes = f.read(4)
+            triangle_count = struct.unpack('<I', triangle_count_bytes)[0]
+            
+            # Read all triangles
+            triangles = []
+            for _ in range(triangle_count):
+                # Each triangle is 50 bytes: 3 vertices (12 bytes each) + normal (12 bytes) + 2 bytes padding
+                triangle_data = f.read(50)
+                if len(triangle_data) < 50:
+                    break
+                
+                # Extract vertices (skip normal and padding)
+                v1 = struct.unpack('<3f', triangle_data[0:12])
+                v2 = struct.unpack('<3f', triangle_data[12:24])
+                v3 = struct.unpack('<3f', triangle_data[24:36])
+                triangles.append((v1, v2, v3))
+        
+        # Calculate volume using signed tetrahedron volume
+        total_volume = 0.0
+        for v1, v2, v3 in triangles:
+            # Calculate signed volume of tetrahedron
+            # Volume = (1/6) * dot(cross(v2-v1, v3-v1), v1)
+            v2_minus_v1 = (v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2])
+            v3_minus_v1 = (v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2])
+            
+            # Cross product: v2_minus_v1 × v3_minus_v1
+            cross_x = v2_minus_v1[1] * v3_minus_v1[2] - v2_minus_v1[2] * v3_minus_v1[1]
+            cross_y = v2_minus_v1[2] * v3_minus_v1[0] - v2_minus_v1[0] * v3_minus_v1[2]
+            cross_z = v2_minus_v1[0] * v3_minus_v1[1] - v2_minus_v1[1] * v3_minus_v1[0]
+            
+            # Dot product with v1
+            dot_product = cross_x * v1[0] + cross_y * v1[1] + cross_z * v1[2]
+            
+            # Add to total volume
+            total_volume += dot_product / 6.0
+        
+        # Convert from mm³ to cm³ and take absolute value
+        volume_cm3 = abs(total_volume) / 1000.0
+        return volume_cm3
+        
+    except Exception as e:
+        print(f"Error calculating volume from STL: {e}")
+        return None
+
 def calculate_volume_with_meshlab(stl_file_path):
-    """Calculate volume using MeshLab command line"""
+    """Calculate volume using MeshLab command line - fallback method"""
     try:
         # Create a temporary MeshLab script
         script_content = """
         <!DOCTYPE FilterScript>
         <FilterScript>
-         <filter name=\"Compute Geometric Measures\">
-          <Param type=\"RichBool\" value=\"true\" name=\"Volume\"/>
+         <filter name="Compute Geometric Measures">
+          <Param type="RichBool" value="true" name="Volume"/>
          </filter>
         </FilterScript>
         """
@@ -115,19 +169,22 @@ def calculate_volume_with_meshlab(stl_file_path):
             script_file.write(script_content)
             script_path = script_file.name
         
-        # Set Qt to use offscreen platform for headless operation
-        os.environ["QT_QPA_PLATFORM"] = "offscreen"
-        # Force OpenGL to use software rendering
-        os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
-        # Run MeshLab command (try without xvfb-run for maximum compatibility)
+        # Set environment variables for headless operation
+        env = os.environ.copy()
+        env["QT_QPA_PLATFORM"] = "offscreen"
+        env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+        env["MESA_GL_VERSION_OVERRIDE"] = "3.3"
+        env["MESA_GLSL_VERSION_OVERRIDE"] = "330"
+        
+        # Run MeshLab command
         cmd = [
-            'meshlabserver',  # MeshLab command line tool
-            '-i', stl_file_path,  # Input STL file
-            '-s', script_path,    # Script file
-            '-o', '/dev/null'     # Output (we don't need it)
+            'meshlabserver',
+            '-i', stl_file_path,
+            '-s', script_path,
+            '-o', '/dev/null'
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
         print("MeshLab stdout:", result.stdout)
         print("MeshLab stderr:", result.stderr)
         
@@ -136,10 +193,9 @@ def calculate_volume_with_meshlab(stl_file_path):
         volume = None
         for line in output_lines:
             if 'Volume:' in line:
-                # Extract volume value (usually in mm³)
                 try:
                     volume_str = line.split('Volume:')[1].strip()
-                    volume = float(volume_str.split()[0])  # Get first number
+                    volume = float(volume_str.split()[0])
                     break
                 except:
                     continue
@@ -148,15 +204,14 @@ def calculate_volume_with_meshlab(stl_file_path):
         os.unlink(script_path)
         
         if volume is not None:
-            # Convert from mm³ to cm³
-            return volume / 1000
+            return volume / 1000  # Convert from mm³ to cm³
         else:
             raise Exception("Could not parse volume from MeshLab output")
             
     except subprocess.TimeoutExpired:
         raise Exception("MeshLab calculation timed out")
     except FileNotFoundError:
-        raise Exception("MeshLab not found. Please install MeshLab: https://www.meshlab.net/")
+        raise Exception("MeshLab not found")
     except Exception as e:
         raise Exception(f"MeshLab calculation failed: {str(e)}")
 
@@ -181,33 +236,49 @@ def upload_stl():
         with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as temp_file:
             file.save(temp_file.name)
             temp_path = temp_file.name
-        print("Calling calculate_volume_with_meshlab with:", temp_path)
+        print("Calling calculate_volume_from_stl with:", temp_path)
         
         try:
-            # Calculate volume using MeshLab
-            volume = calculate_volume_with_meshlab(temp_path)
+            # Try direct STL parsing first (more reliable in headless environments)
+            volume = calculate_volume_from_stl(temp_path)
+            calculation_method = 'STL Parser'
             
-            return jsonify({
-                'success': True,
-                'volume': volume,
-                'filename': file.filename,
-                'calculationMethod': 'MeshLab'
-            })
+            # If direct parsing fails, try MeshLab as fallback
+            if volume is None:
+                print("Direct STL parsing failed, trying MeshLab...")
+                volume = calculate_volume_with_meshlab(temp_path)
+                calculation_method = 'MeshLab'
+            
+            if volume is not None:
+                return jsonify({
+                    'success': True,
+                    'volume': volume,
+                    'filename': file.filename,
+                    'calculationMethod': calculation_method
+                })
+            else:
+                # Final fallback to estimation
+                file_size = os.path.getsize(temp_path)
+                estimated_volume = file_size / 1000  # Rough estimation
+                return jsonify({
+                    'success': True,
+                    'volume': estimated_volume,
+                    'filename': file.filename,
+                    'calculationMethod': 'Estimated (all methods failed)',
+                    'warning': 'Volume calculation failed, using estimation'
+                })
             
         except Exception as e:
-            print("Error in calculate_volume_with_meshlab:", str(e))
-            # Fallback to estimation if MeshLab fails
-            print(f"MeshLab calculation failed: {e}")
-            # For now, return an estimated volume based on file size
-            # This is a rough estimation - in practice, you'd want a better fallback
+            print("Error in volume calculation:", str(e))
+            # Fallback to estimation
             file_size = os.path.getsize(temp_path)
-            estimated_volume = file_size / 1000  # Rough estimation
+            estimated_volume = file_size / 1000
             return jsonify({
                 'success': True,
                 'volume': estimated_volume,
                 'filename': file.filename,
-                'calculationMethod': 'Estimated (MeshLab unavailable)',
-                'warning': 'MeshLab calculation failed, using estimation'
+                'calculationMethod': 'Estimated (calculation failed)',
+                'warning': f'Volume calculation failed: {str(e)}, using estimation'
             })
         
         finally:
@@ -236,12 +307,13 @@ def calculate_cost():
         if not material or not volume:
             return jsonify({'error': 'Missing material or volume'}), 400
 
-        # Get material data from Firestore
+        # Get material data from Firestore - FIXED: Use proper filter syntax
         if db is None:
             return jsonify({'error': 'Database not available'}), 500
             
         materials_ref = db.collection('materials')
-        material_docs = materials_ref.where('name', '==', material).limit(1).stream()
+        # Use the new filter syntax to avoid the warning
+        material_docs = materials_ref.filter(firestore.FieldFilter('name', '==', material)).limit(1).stream()
         
         material_data = None
         for doc in material_docs:
@@ -255,13 +327,14 @@ def calculate_cost():
         price_per_gram = material_data.get('price', 0)
         density = material_data.get('density', 1.24)  # g/cm³, fallback to default
         
-        # Try to use MeshLab for accurate volume calculation if STL file is available
+        # Try to use more accurate volume calculation if STL file is available
         if stl_file_path and os.path.exists(stl_file_path):
             try:
-                actual_volume = calculate_volume_with_meshlab(stl_file_path)
-                volume = actual_volume  # Use the more accurate volume
+                actual_volume = calculate_volume_from_stl(stl_file_path)
+                if actual_volume is not None:
+                    volume = actual_volume
             except Exception as e:
-                print(f"MeshLab calculation failed, using provided volume: {e}")
+                print(f"Volume calculation failed, using provided volume: {e}")
                 # Fall back to provided volume
         
         # Improved calculation using actual volume
@@ -311,7 +384,7 @@ def calculate_cost():
                 'density': density,
                 'pricePerGram': price_per_gram,
                 'originalVolume': round(volume, 2),
-                'calculationMethod': 'MeshLab' if stl_file_path and os.path.exists(stl_file_path) else 'Estimated'
+                'calculationMethod': 'STL Parser' if stl_file_path and os.path.exists(stl_file_path) else 'Estimated'
             }
         })
         
