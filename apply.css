@@ -1,0 +1,273 @@
+/* Apply Page Styles for Outprint */
+body {
+  background: #557c83;
+}
+
+.page-container {
+  width: 90vw;
+  max-width: 1100px;
+  min-width: 320px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.content-box {
+  background: #fff;
+  color: #222;
+  padding: 36px 32px 32px 32px;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#printer-application-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 0;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #e6642e;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"],
+textarea,
+select {
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+  background: #fff;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #e6642e;
+  box-shadow: 0 0 0 3px rgba(230, 100, 46, 0.1);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+button {
+  background: #e6642e;
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background: #d55a28;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Printer section styles */
+.printers-section {
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 24px;
+  background: #fafafa;
+}
+
+.printers-section h3 {
+  color: #e6642e;
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+#printers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.printer-entry {
+  display: grid;
+  grid-template-columns: 1fr 80px 160px 140px 100px 40px;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.printer-entry label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.printer-entry input,
+.printer-entry select {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.remove-printer-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.remove-printer-btn:hover {
+  background: #cc3333;
+}
+
+.remove-printer-btn .material-icons {
+  font-size: 18px;
+}
+
+#add-printer-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  align-self: flex-start;
+}
+
+#add-printer-btn:hover {
+  background: #218838;
+}
+
+/* Success and Error Messages */
+.success-message,
+.error-message {
+  text-align: center;
+  padding: 40px 20px;
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.success-message {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.error-message {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.success-icon,
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  font-weight: bold;
+}
+
+.success-icon {
+  color: #28a745;
+}
+
+.error-icon {
+  color: #dc3545;
+}
+
+.success-message h2,
+.error-message h3 {
+  margin-bottom: 16px;
+  font-size: 24px;
+}
+
+.success-message p,
+.error-message p {
+  margin-bottom: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.application-details {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 24px;
+  text-align: left;
+}
+
+.application-details h3 {
+  color: #e6642e;
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+.application-details p {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.application-details strong {
+  color: #333;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .page-container {
+    width: 95vw;
+    padding: 0 10px;
+  }
+  
+  .content-box {
+    padding: 24px 16px;
+  }
+  
+  .printer-entry {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .printer-entry label {
+    margin-bottom: 2px;
+  }
+  
+  .remove-printer-btn {
+    align-self: flex-end;
+    margin-top: 8px;
+  }
+} 

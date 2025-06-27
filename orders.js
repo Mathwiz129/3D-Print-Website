@@ -128,6 +128,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="price" style="font-weight:bold; font-size:1.1em; color:#e6642e;">$0.00</span>
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span style="font-size:15px; color:#888;">weight</span>
+            <span class="weight" style="font-weight:bold; font-size:1.1em; color:#666;">0g</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
             <span style="font-size:15px; color:#888;">total</span>
             <span class="cost" style="font-weight:bold; font-size:1.1em; color:#e6642e;">$0.00</span>
           </div>
@@ -337,16 +341,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Update the cost information on a part card using Firestore material data
-  function updateCard(card) {
+  async function updateCard(card) {
     const materialName = card.querySelector(".material").value;
     const colorHex = card.querySelector(".color").value;
-    const infill = parseFloat(card.querySelector(".infill").value) || 0;
+    const infill = parseFloat(card.querySelector(".infill").value) || 20;
     const qty = parseInt(card.querySelector(".qty").value) || 1;
     const volume = parseFloat(card.dataset.volume || 0);
 
     if (!materialName || !colorHex || volume === 0) {
       card.querySelector(".price").textContent = "$0.00";
       card.querySelector(".cost").textContent = "$0.00";
+      card.querySelector(".weight").textContent = "0g";
       card.dataset.cost = 0;
       updateSummary();
       return;
@@ -357,25 +362,72 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!materialObj) {
       card.querySelector(".price").textContent = "$0.00";
       card.querySelector(".cost").textContent = "$0.00";
+      card.querySelector(".weight").textContent = "0g";
       card.dataset.cost = 0;
       updateSummary();
       return;
     }
 
-    // Calculate price: grams = volume * infill * density
-    const density = parseFloat(materialObj.density) || 1.0;
-    const pricePerGram = parseFloat(materialObj.price) || 0.05;
-    const grams = volume * (infill / 100) * density;
-    const unit = grams * pricePerGram;
-    const priceElem = card.querySelector(".price");
-    const costElem = card.querySelector(".cost");
-    priceElem.textContent = `$${unit.toFixed(2)}`;
-    const total = unit * qty;
-    costElem.textContent = `$${total.toFixed(2)}`;
-    card.dataset.cost = total;
-    updateSummary();
-    flashUpdate(priceElem);
-    flashUpdate(costElem);
+    try {
+      // Use the improved backend calculation
+      const response = await fetch('/calculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          material: materialName,
+          volume: volume,
+          infill: infill,
+          wallThickness: 1.2,
+          layerHeight: 0.2,
+          supportPercentage: 0
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      const unit = result.cost;
+      const grams = result.breakdown.grams;
+      const priceElem = card.querySelector(".price");
+      const costElem = card.querySelector(".cost");
+      const weightElem = card.querySelector(".weight");
+      
+      priceElem.textContent = `$${unit.toFixed(2)}`;
+      const total = unit * qty;
+      costElem.textContent = `$${total.toFixed(2)}`;
+      weightElem.textContent = `${grams.toFixed(1)}g`;
+      card.dataset.cost = total;
+      updateSummary();
+      flashUpdate(priceElem);
+      flashUpdate(costElem);
+      flashUpdate(weightElem);
+      
+    } catch (error) {
+      console.error('Error calculating cost:', error);
+      // Fallback to simple calculation if API fails
+      const density = parseFloat(materialObj.density) || 1.0;
+      const pricePerGram = parseFloat(materialObj.price) || 0.05;
+      const grams = volume * (infill / 100) * density;
+      const unit = grams * pricePerGram;
+      const priceElem = card.querySelector(".price");
+      const costElem = card.querySelector(".cost");
+      const weightElem = card.querySelector(".weight");
+      priceElem.textContent = `$${unit.toFixed(2)}`;
+      const total = unit * qty;
+      costElem.textContent = `$${total.toFixed(2)}`;
+      weightElem.textContent = `${grams.toFixed(1)}g`;
+      card.dataset.cost = total;
+      updateSummary();
+    }
   }
 
   // Simple function to add a CSS flash class and remove it after a short delay

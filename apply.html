@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Apply to Be a Printer</title>
   <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="apply.css"/>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
 </head>
 <body>
@@ -42,9 +43,35 @@
       </div>
 
       <h2 class="section-title">Ready to Join?</h2>
-      <div class="form-wrapper">
-        <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSeJnVTP9qRx1cdbbrSa4p04u6on1dGHnvAlRRT7lTG868kmrA/viewform?embedded=true" width="100%" height="1200" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
-      </div>
+      <form id="printer-application-form">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" name="name" required />
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+        <div class="form-group">
+          <label for="materials">What materials can you print? <span style="font-weight:normal; color:#888;">(You can always change this later)</span></label>
+          <input type="text" id="materials" name="materials" placeholder="e.g., PLA, PETG, ABS, TPU" required />
+        </div>
+        <div class="form-group">
+          <label>3D Printers You Own</label>
+          <div id="printers-list"></div>
+          <button type="button" id="add-printer-btn" class="auth-button" style="width:auto; margin-top:10px;">Add Printer</button>
+        </div>
+        <div class="form-group">
+          <label for="colors">What colors do you have available? <span style="font-weight:normal; color:#888;">(You can always change this later)</span></label>
+          <input type="text" id="colors" name="colors" placeholder="e.g. Red, Blue, Black, White" required />
+        </div>
+        <div class="form-group">
+          <label for="bio">Tell us about your experience or setup (optional)</label>
+          <textarea id="bio" name="bio" rows="3" placeholder="Share your experience, portfolio, or anything else..."></textarea>
+        </div>
+        <button type="submit" class="auth-button">Submit Application</button>
+        <div id="application-message" style="margin-top:16px;"></div>
+      </form>
     </div>
   </main>
 
@@ -53,5 +80,7 @@
 
 <script type="module" src="firebase-config.js"></script>
 <script src="nav.js"></script>
+<script src="printers-presets.js"></script>
+<script src="apply.js"></script>
 </body>
 </html>
