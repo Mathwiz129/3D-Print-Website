@@ -120,7 +120,7 @@ def calculate_volume_with_meshlab(stl_file_path):
         
         # Run MeshLab command
         cmd = [
-            'meshlabserver',  # MeshLab command line tool
+            'xvfb-run', '-a', 'meshlabserver',  # Run headless with virtual framebuffer
             '-i', stl_file_path,  # Input STL file
             '-s', script_path,    # Script file
             '-o', '/dev/null'     # Output (we don't need it)

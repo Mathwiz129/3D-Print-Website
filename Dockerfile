@@ -1,9 +1,10 @@
 # Use an official Python base image
 FROM ubuntu:22.04
 
-# Install Python, pip, MeshLab, and other dependencies
+# Install Python, pip, MeshLab, and required Qt/X11 libraries for headless operation
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip meshlab git && \
+    apt-get install -y python3 python3-pip meshlab git \
+    libxkbcommon-x11-0 libxcb-xinerama0 libglu1-mesa xvfb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
