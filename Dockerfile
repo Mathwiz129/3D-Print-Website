@@ -1,9 +1,9 @@
 # Use an official Python base image
-FROM python:3.9
+FROM ubuntu:22.04
 
-# Install system dependencies (MeshLab, git, etc.)
+# Install Python, pip, MeshLab, and other dependencies
 RUN apt-get update && \
-    apt-get install -y meshlab git && \
+    apt-get install -y python3 python3-pip meshlab git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
@@ -11,7 +11,7 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
 COPY . .
