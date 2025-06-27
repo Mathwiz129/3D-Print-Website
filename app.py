@@ -75,6 +75,27 @@ def admin():
 def serve_static(filename):
     return send_from_directory('.', filename)
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint to verify server and MeshLab status"""
+    try:
+        # Check if MeshLab is available
+        result = subprocess.run(['meshlabserver', '--version'], 
+                              capture_output=True, text=True, timeout=5)
+        meshlab_available = result.returncode == 0
+        meshlab_version = result.stdout.strip() if meshlab_available else "Not available"
+    except:
+        meshlab_available = False
+        meshlab_version = "Not installed"
+    
+    return jsonify({
+        'status': 'healthy',
+        'firebase_connected': db is not None,
+        'meshlab_available': meshlab_available,
+        'meshlab_version': meshlab_version,
+        'timestamp': datetime.now().isoformat()
+    })
+
 def calculate_volume_with_meshlab(stl_file_path):
     """Calculate volume using MeshLab command line"""
     try:
