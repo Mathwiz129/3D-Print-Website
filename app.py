@@ -127,6 +127,8 @@ def calculate_volume_with_meshlab(stl_file_path):
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        print("MeshLab stdout:", result.stdout)
+        print("MeshLab stderr:", result.stderr)
         
         # Parse output for volume
         output_lines = result.stdout.split('\n')
