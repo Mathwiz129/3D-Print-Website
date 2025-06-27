@@ -18,14 +18,13 @@ CORS(app)  # Allows cross-origin requests from your frontend
 if not firebase_admin._apps:
     try:
         # Try to use environment variable (for Render deployment)
-        import json
-        print("GOOGLE_APPLICATION_CREDENTIALS:", os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
-        print("File exists:", os.path.exists(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
-        if os.path.exists(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')):
-            with open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')) as f:
+        firebase_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+        print("GOOGLE_APPLICATION_CREDENTIALS:", firebase_creds)
+        print("File exists:", os.path.exists(firebase_creds))
+        if firebase_creds and os.path.exists(firebase_creds):
+            with open(firebase_creds) as f:
                 print("First 100 chars of file:", f.read(100))
-            cred_dict = json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
-            cred = credentials.Certificate(cred_dict)
+            cred = credentials.Certificate(firebase_creds)
         else:
             # Fall back to file (for local development)
             cred = credentials.Certificate("outprint-3d-printing-firebase-adminsdk-fbsvc-bee53169f9.json")
