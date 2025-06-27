@@ -118,9 +118,11 @@ def calculate_volume_with_meshlab(stl_file_path):
             script_file.write(script_content)
             script_path = script_file.name
         
-        # Run MeshLab command
+        # Set Qt to use offscreen platform for headless operation
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        # Run MeshLab command (try without xvfb-run for maximum compatibility)
         cmd = [
-            'xvfb-run', '-a', 'meshlabserver',  # Run headless with virtual framebuffer
+            'meshlabserver',  # MeshLab command line tool
             '-i', stl_file_path,  # Input STL file
             '-s', script_path,    # Script file
             '-o', '/dev/null'     # Output (we don't need it)
