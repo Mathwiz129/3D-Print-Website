@@ -19,10 +19,12 @@ if not firebase_admin._apps:
     try:
         # Try to use environment variable (for Render deployment)
         import json
-        firebase_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        if firebase_creds:
-            # Parse the JSON string from environment variable
-            cred_dict = json.loads(firebase_creds)
+        print("GOOGLE_APPLICATION_CREDENTIALS:", os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
+        print("File exists:", os.path.exists(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
+        if os.path.exists(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')):
+            with open(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')) as f:
+                print("First 100 chars of file:", f.read(100))
+            cred_dict = json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
             cred = credentials.Certificate(cred_dict)
         else:
             # Fall back to file (for local development)
