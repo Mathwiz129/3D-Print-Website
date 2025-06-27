@@ -161,22 +161,26 @@ def calculate_volume_with_meshlab(stl_file_path):
 
 @app.route('/upload-stl', methods=['POST'])
 def upload_stl():
-    """Upload STL file and calculate volume using MeshLab"""
+    print("upload_stl endpoint called")
     try:
         if 'file' not in request.files:
+            print("No file provided in request.files")
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
         if file.filename == '':
+            print("No file selected (empty filename)")
             return jsonify({'error': 'No file selected'}), 400
         
         if not file.filename.lower().endswith('.stl'):
+            print("File is not an STL file:", file.filename)
             return jsonify({'error': 'File must be an STL file'}), 400
         
         # Create a temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as temp_file:
             file.save(temp_file.name)
             temp_path = temp_file.name
+        print("Calling calculate_volume_with_meshlab with:", temp_path)
         
         try:
             # Calculate volume using MeshLab
@@ -190,6 +194,7 @@ def upload_stl():
             })
             
         except Exception as e:
+            print("Error in calculate_volume_with_meshlab:", str(e))
             # Fallback to estimation if MeshLab fails
             print(f"MeshLab calculation failed: {e}")
             # For now, return an estimated volume based on file size
@@ -212,7 +217,7 @@ def upload_stl():
                 pass
                 
     except Exception as e:
-        print(f"Error uploading STL: {str(e)}")
+        print("Error in upload_stl:", str(e))
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/calculate', methods=['POST'])
