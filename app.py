@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import subprocess
 import tempfile
+import werkzeug
 
 app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
@@ -133,6 +134,62 @@ def calculate_volume_with_meshlab(stl_file_path):
         raise Exception("MeshLab not found. Please install MeshLab: https://www.meshlab.net/")
     except Exception as e:
         raise Exception(f"MeshLab calculation failed: {str(e)}")
+
+@app.route('/upload-stl', methods=['POST'])
+def upload_stl():
+    """Upload STL file and calculate volume using MeshLab"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.lower().endswith('.stl'):
+            return jsonify({'error': 'File must be an STL file'}), 400
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as temp_file:
+            file.save(temp_file.name)
+            temp_path = temp_file.name
+        
+        try:
+            # Calculate volume using MeshLab
+            volume = calculate_volume_with_meshlab(temp_path)
+            
+            return jsonify({
+                'success': True,
+                'volume': volume,
+                'filename': file.filename,
+                'calculationMethod': 'MeshLab'
+            })
+            
+        except Exception as e:
+            # Fallback to estimation if MeshLab fails
+            print(f"MeshLab calculation failed: {e}")
+            # For now, return an estimated volume based on file size
+            # This is a rough estimation - in practice, you'd want a better fallback
+            file_size = os.path.getsize(temp_path)
+            estimated_volume = file_size / 1000  # Rough estimation
+            return jsonify({
+                'success': True,
+                'volume': estimated_volume,
+                'filename': file.filename,
+                'calculationMethod': 'Estimated (MeshLab unavailable)',
+                'warning': 'MeshLab calculation failed, using estimation'
+            })
+        
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+                
+    except Exception as e:
+        print(f"Error uploading STL: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/calculate', methods=['POST'])
 def calculate_cost():

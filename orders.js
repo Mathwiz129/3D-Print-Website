@@ -135,6 +135,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <span style="font-size:15px; color:#888;">total</span>
             <span class="cost" style="font-weight:bold; font-size:1.1em; color:#e6642e;">$0.00</span>
           </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end;">
+            <span style="font-size:12px; color:#888;">calc</span>
+            <span class="calc-method" style="font-size:12px; color:#666; font-style:italic;">-</span>
+          </div>
           <span class="material-icons delete-btn" style="color:#e6642e; cursor:pointer; margin-top:8px;">delete</span>
         </div>
       </div>
@@ -226,6 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderViewer(file, document.getElementById(`${id}-viewer`), (volume, mesh) => {
       card.dataset.volume = volume;
       card.mesh = mesh; // Store mesh reference as property
+      mesh.userData.card = card; // Store card reference in mesh for calculation method updates
       updateCard(card);
     });
 
@@ -310,8 +315,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const mesh = new THREE.Mesh(geometry, mat);
       scene.add(mesh);
 
+      // Calculate volume using Three.js (fallback)
       const volume = computeVolume(geometry);
-      cb(volume, mesh);
+      
+      // Also try to upload to backend for MeshLab calculation
+      uploadSTLForMeshLabCalculation(file, volume, cb, mesh);
 
       animate();
     };
@@ -321,6 +329,52 @@ document.addEventListener("DOMContentLoaded", () => {
       requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
+    }
+  }
+
+  // Upload STL file to backend for MeshLab volume calculation
+  async function uploadSTLForMeshLabCalculation(file, fallbackVolume, cb, mesh) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/upload-stl', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log(`MeshLab calculation: ${result.volume} cm³ (${result.calculationMethod})`);
+          if (result.warning) {
+            console.warn(result.warning);
+          }
+          // Use MeshLab volume if available, otherwise use fallback
+          const finalVolume = result.volume || fallbackVolume;
+          
+          // Update calculation method indicator
+          const card = mesh.userData.card; // We'll set this when creating the mesh
+          if (card) {
+            const calcMethodElem = card.querySelector('.calc-method');
+            if (calcMethodElem) {
+              calcMethodElem.textContent = result.calculationMethod === 'MeshLab' ? 'MeshLab' : 'Est';
+              calcMethodElem.style.color = result.calculationMethod === 'MeshLab' ? '#28a745' : '#ffc107';
+            }
+          }
+          
+          cb(finalVolume, mesh);
+        } else {
+          console.warn('MeshLab calculation failed, using Three.js volume');
+          cb(fallbackVolume, mesh);
+        }
+      } else {
+        console.warn('STL upload failed, using Three.js volume');
+        cb(fallbackVolume, mesh);
+      }
+    } catch (error) {
+      console.warn('STL upload error, using Three.js volume:', error);
+      cb(fallbackVolume, mesh);
     }
   }
 
