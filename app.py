@@ -104,11 +104,8 @@ def calculate_volume_with_meshlab(stl_file_path):
         script_content = """
         <!DOCTYPE FilterScript>
         <FilterScript>
-         <filter name="Compute Geometric Measures">
-          <Param type="RichBool" value="true" name="Volume"/>
-          <Param type="RichBool" value="false" name="Surface"/>
-          <Param type="RichBool" value="false" name="Shape"/>
-          <Param type="RichBool" value="false" name="Topology"/>
+         <filter name=\"Compute Geometric Measures\">
+          <Param type=\"RichBool\" value=\"true\" name=\"Volume\"/>
          </filter>
         </FilterScript>
         """
