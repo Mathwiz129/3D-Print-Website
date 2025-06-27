@@ -1,5 +1,5 @@
 # Use an official Python base image
-FROM python:3.9-slim
+FROM python:3.9
 
 # Install system dependencies (MeshLab, git, etc.)
 RUN apt-get update && \
