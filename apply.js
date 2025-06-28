@@ -1,13 +1,65 @@
 // Apply Page Dynamic Logic
 
 document.addEventListener('DOMContentLoaded', function() {
+  let isLoggedIn = false;
+  const loginMsg = document.getElementById('login-required-message');
+  const form = document.getElementById('printer-application-form');
+
+  if (typeof FirebaseAuth === 'undefined') {
+    console.error('Firebase not loaded. Make sure firebase-config.js is included.');
+    return;
+  }
+  const { auth, onAuthStateChanged } = FirebaseAuth;
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      isLoggedIn = false;
+      if (loginMsg) loginMsg.style.display = 'block';
+      if (form) {
+        Array.from(form.elements).forEach(el => el.disabled = true);
+      }
+    } else {
+      isLoggedIn = true;
+      if (loginMsg) loginMsg.style.display = 'none';
+      if (form) {
+        Array.from(form.elements).forEach(el => el.disabled = false);
+      }
+      // Autofill name and email
+      const nameInput = document.getElementById('name');
+      const emailInput = document.getElementById('email');
+      if (nameInput) {
+        nameInput.value = user.displayName || user.email.split('@')[0];
+        nameInput.readOnly = true;
+        nameInput.style.background = '#f5f5f5';
+      }
+      if (emailInput) {
+        emailInput.value = user.email;
+        emailInput.readOnly = true;
+        emailInput.style.background = '#f5f5f5';
+      }
+    }
+  });
+
+  // If not logged in, flash message if user tries to type
+  if (form) {
+    form.addEventListener('input', function(e) {
+      if (!isLoggedIn) {
+        if (loginMsg) {
+          loginMsg.style.display = 'block';
+          loginMsg.classList.add('flash');
+          setTimeout(() => loginMsg.classList.remove('flash'), 400);
+        }
+        e.preventDefault();
+        e.target.value = '';
+      }
+    }, true);
+  }
+
   // Printer Presets
   const PRINTERS = window.PRINTER_PRESETS || [];
 
   // Elements
   const printersList = document.getElementById('printers-list');
   const addPrinterBtn = document.getElementById('add-printer-btn');
-  const form = document.getElementById('printer-application-form');
 
   // Form submission handler
   form.addEventListener('submit', async function(e) {
@@ -189,11 +241,18 @@ document.addEventListener('DOMContentLoaded', function() {
     speedLabel.textContent = 'Speed';
 
     // Layout
-    entry.appendChild(selectLabel); entry.appendChild(select);
-    entry.appendChild(qtyLabel); entry.appendChild(qty);
-    entry.appendChild(bedLabel); entry.appendChild(bedSize);
-    entry.appendChild(matLabel); entry.appendChild(materials);
-    entry.appendChild(speedLabel); entry.appendChild(speed);
+    function makeField(label, input) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'printer-field';
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      return wrapper;
+    }
+    entry.appendChild(makeField(selectLabel, select));
+    entry.appendChild(makeField(qtyLabel, qty));
+    entry.appendChild(makeField(bedLabel, bedSize));
+    entry.appendChild(makeField(matLabel, materials));
+    entry.appendChild(makeField(speedLabel, speed));
     entry.appendChild(removeBtn);
     
     // Insert after the add button instead of at the end

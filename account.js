@@ -267,5 +267,66 @@ function viewOrders() {
 }
 
 function viewApplications() {
-    alert('View applications functionality coming soon!');
+    // Remove any existing modal
+    let oldModal = document.getElementById('applicationsModal');
+    if (oldModal) oldModal.remove();
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'applicationsModal';
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close" id="closeApplicationsModal">&times;</span>
+        <h2 class="modal-title">Your Applications</h2>
+        <div id="applicationsList">
+          <div class="loading">Loading applications...</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Close logic
+    document.getElementById('closeApplicationsModal').onclick = () => modal.remove();
+    window.onclick = (event) => { if (event.target === modal) modal.remove(); };
+
+    // Use Firebase Auth to get ID token
+    if (typeof FirebaseAuth === 'undefined' || !FirebaseAuth.auth.currentUser) {
+      document.getElementById('applicationsList').innerHTML = '<div class="error">You must be logged in to view applications.</div>';
+      return;
+    }
+    FirebaseAuth.auth.currentUser.getIdToken().then(token => {
+      fetch('/api/applications', {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
+      })
+        .then(res => res.json())
+        .then(apps => {
+          const list = document.getElementById('applicationsList');
+          if (!Array.isArray(apps) || apps.length === 0) {
+            list.innerHTML = '<div class="empty">No applications found.</div>';
+            return;
+          }
+          list.innerHTML = apps.map(app => {
+            const status = (app.status || 'pending').toLowerCase();
+            return `
+              <div class="application-card ${status}">
+                <div class="app-row"><span class="app-label">Date:</span> <span class="app-value">${app.createdAt ? new Date(app.createdAt).toLocaleString() : ''}</span></div>
+                <div class="app-row"><span class="app-label">Status:</span> <span class="app-value"><span class="app-status ${status}">${app.status || 'pending'}</span></span></div>
+                <div class="app-row"><span class="app-label">Materials:</span> <span class="app-value">${app.materials || ''}</span></div>
+                <div class="app-row"><span class="app-label">Colors:</span> <span class="app-value">${app.availability || app.colors || ''}</span></div>
+                <div class="app-row"><span class="app-label">Experience:</span> <span class="app-value">${app.experience || app.bio || ''}</span></div>
+                <div class="app-row"><span class="app-label">Printers:</span> <span class="app-value">${app.printerInfo || (app.printers ? app.printers.length + ' printers' : '')}</span></div>
+              </div>
+            `;
+          }).join('');
+        })
+        .catch(err => {
+          document.getElementById('applicationsList').innerHTML = '<div class="error">Failed to load applications.</div>';
+        });
+    }).catch(() => {
+      document.getElementById('applicationsList').innerHTML = '<div class="error">Failed to authenticate. Please log in again.</div>';
+    });
 } 

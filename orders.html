@@ -35,6 +35,10 @@
           <span>Total</span>
           <strong id="summaryTotal">$0.00</strong>
         </div>
+        <button id="checkoutBtn" class="checkout-btn" style="display: none;">
+          <span class="material-icons">shopping_cart</span>
+          Proceed to Checkout
+        </button>
       </div>
     </aside>
   </div>
@@ -46,6 +50,128 @@
       <div class="modal-actions">
         <button id="cancelDelete">Cancel</button>
         <button id="confirmDelete" class="danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="checkoutModal" class="modal">
+    <div class="modal-card checkout-modal">
+      <div class="checkout-header">
+        <h3>Checkout</h3>
+        <span class="material-icons close-btn" id="closeCheckout">close</span>
+      </div>
+      
+      <div class="checkout-content">
+        <div class="order-review">
+          <h4>Order Review</h4>
+          <div id="checkoutItems"></div>
+          <div class="checkout-total">
+            <span>Total</span>
+            <strong id="checkoutTotal">$0.00</strong>
+          </div>
+        </div>
+        
+        <div class="customer-info">
+          <h4>Customer Information</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="firstName">First Name *</label>
+              <input type="text" id="firstName" required>
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last Name *</label>
+              <input type="text" id="lastName" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="email">Email *</label>
+            <input type="email" id="email" required>
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone">
+          </div>
+        </div>
+        
+        <div class="shipping-info">
+          <h4>Shipping Address</h4>
+          <div class="form-group">
+            <label for="address">Street Address *</label>
+            <input type="text" id="address" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="city">City *</label>
+              <input type="text" id="city" required>
+            </div>
+            <div class="form-group">
+              <label for="state">State *</label>
+              <input type="text" id="state" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="zipCode">ZIP Code *</label>
+              <input type="text" id="zipCode" required>
+            </div>
+            <div class="form-group">
+              <label for="country">Country *</label>
+              <input type="text" id="country" value="United States" required>
+            </div>
+          </div>
+        </div>
+        
+        <div class="payment-info">
+          <h4>Payment Information</h4>
+          <div class="payment-method">
+            <label>
+              <input type="radio" name="paymentMethod" value="mock" checked>
+              <span class="payment-label">Mock Payment (Demo)</span>
+            </label>
+            <p class="payment-note">This is a demo payment system. No real charges will be made.</p>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cardNumber">Card Number</label>
+              <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19">
+            </div>
+            <div class="form-group">
+              <label for="expiry">Expiry Date</label>
+              <input type="text" id="expiry" placeholder="MM/YY" maxlength="5">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cvv">CVV</label>
+              <input type="text" id="cvv" placeholder="123" maxlength="3">
+            </div>
+            <div class="form-group">
+              <label for="cardName">Name on Card</label>
+              <input type="text" id="cardName">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="checkout-actions">
+        <button id="cancelCheckout" class="btn-secondary">Cancel</button>
+        <button id="placeOrder" class="btn-primary">
+          <span class="material-icons">payment</span>
+          Place Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="successModal" class="modal">
+    <div class="modal-card success-modal">
+      <span class="material-icons">check_circle</span>
+      <h3>Order Placed Successfully!</h3>
+      <p>Thank you for your order. We'll start processing it right away.</p>
+      <div class="order-number" id="orderNumber"></div>
+      <p>You'll receive a confirmation email shortly with order details and tracking information.</p>
+      <div class="checkout-actions">
+        <button id="continueShopping" class="btn-primary">Continue Shopping</button>
       </div>
     </div>
   </div>
