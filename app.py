@@ -13,6 +13,7 @@ import werkzeug
 import struct
 import math
 import trimesh
+import requests
 
 app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
@@ -653,6 +654,47 @@ def admin_update_or_delete_application(app_id):
         except Exception as e:
             print('Error deleting application:', e)
             return jsonify({'error': 'Failed to delete application'}), 500
+
+@app.route('/api/firebase-config')
+def get_firebase_config():
+    """Serve Firebase config from environment variables"""
+    config = {
+        "apiKey": os.environ.get('FIREBASE_API_KEY'),
+        "authDomain": os.environ.get('FIREBASE_AUTH_DOMAIN'),
+        "projectId": os.environ.get('FIREBASE_PROJECT_ID'),
+        "storageBucket": os.environ.get('FIREBASE_STORAGE_BUCKET'),
+        "messagingSenderId": os.environ.get('FIREBASE_MESSAGING_SENDER_ID'),
+        "appId": os.environ.get('FIREBASE_APP_ID'),
+        "measurementId": os.environ.get('FIREBASE_MEASUREMENT_ID')
+    }
+    return jsonify(config)
+
+@app.route('/api/sheets-data')
+def get_sheets_data():
+    """Fetch Google Sheets data securely from backend"""
+    sheet_id = "1H6XhzxP4rr6gXOBdhGBhIory9gBKWudl2FD7p8cdgrU"
+    api_key = os.environ.get('GOOGLE_SHEETS_API_KEY')
+    
+    if not api_key:
+        return jsonify({'error': 'Google Sheets API key not configured'}), 500
+    
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A2:B2?alt=json&key={api_key}"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data.get('values') and data['values'][0]:
+            return jsonify({
+                'printers': data['values'][0][0],
+                'orders': data['values'][0][1]
+            })
+        else:
+            return jsonify({'error': 'No data found in sheet'}), 404
+            
+    except requests.RequestException as e:
+        return jsonify({'error': f'Failed to fetch sheet data: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
