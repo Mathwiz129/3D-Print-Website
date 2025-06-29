@@ -7,11 +7,40 @@
 async function renderMaterialsTable() {
   const container = document.getElementById('materials-table-container');
   if (!container) return;
-  // Option 1: Real-time updates (uncomment to use)
-  // window.MaterialsFirestore.listenToMaterialsInFirestore(materials => renderTable(materials, container));
-  // Option 2: One-time fetch
-  const materials = await window.MaterialsFirestore.getMaterialsFromFirestore();
-  renderTable(materials, container);
+  
+  // Wait for Firebase to be initialized
+  if (!window.MaterialsFirestore) {
+    // Listen for Firebase ready event
+    window.addEventListener('firebaseReady', async () => {
+      await renderMaterialsTableInternal();
+    });
+    
+    // Also listen for Firebase error
+    window.addEventListener('firebaseError', (event) => {
+      console.error('Firebase initialization failed:', event.detail);
+      container.innerHTML = '<p>Error loading materials. Please refresh the page.</p>';
+    });
+    
+    return;
+  }
+  
+  await renderMaterialsTableInternal();
+}
+
+async function renderMaterialsTableInternal() {
+  const container = document.getElementById('materials-table-container');
+  if (!container) return;
+  
+  try {
+    // Option 1: Real-time updates (uncomment to use)
+    // window.MaterialsFirestore.listenToMaterialsInFirestore(materials => renderTable(materials, container));
+    // Option 2: One-time fetch
+    const materials = await window.MaterialsFirestore.getMaterialsFromFirestore();
+    renderTable(materials, container);
+  } catch (error) {
+    console.error('Error loading materials:', error);
+    container.innerHTML = '<p>Error loading materials. Please try again.</p>';
+  }
 }
 
 function renderTable(materials, container) {

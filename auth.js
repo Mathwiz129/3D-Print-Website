@@ -2,6 +2,21 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for Firebase to be loaded
     if (typeof FirebaseAuth === 'undefined') {
+        // Listen for Firebase ready event
+        window.addEventListener('firebaseReady', initializeAuth);
+        window.addEventListener('firebaseError', (event) => {
+            console.error('Firebase initialization failed:', event.detail);
+        });
+        return;
+    }
+    
+    // Firebase is already loaded, initialize immediately
+    initializeAuth();
+});
+
+function initializeAuth() {
+    // Wait for Firebase to be loaded
+    if (typeof FirebaseAuth === 'undefined') {
         console.error('Firebase not loaded. Make sure firebase-config.js is included.');
         return;
     }
@@ -42,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (signupForm) {
         signupForm.addEventListener('submit', handleSignup);
     }
-});
+}
 
 // Handle login form submission
 async function handleLogin(event) {

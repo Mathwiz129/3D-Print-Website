@@ -5,39 +5,54 @@ document.addEventListener('DOMContentLoaded', function() {
   const loginMsg = document.getElementById('login-required-message');
   const form = document.getElementById('printer-application-form');
 
-  if (typeof FirebaseAuth === 'undefined') {
-    console.error('Firebase not loaded. Make sure firebase-config.js is included.');
-    return;
-  }
-  const { auth, onAuthStateChanged } = FirebaseAuth;
-  onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      isLoggedIn = false;
-      if (loginMsg) loginMsg.style.display = 'block';
-      if (form) {
-        Array.from(form.elements).forEach(el => el.disabled = true);
-      }
-    } else {
-      isLoggedIn = true;
-      if (loginMsg) loginMsg.style.display = 'none';
-      if (form) {
-        Array.from(form.elements).forEach(el => el.disabled = false);
-      }
-      // Autofill name and email
-      const nameInput = document.getElementById('name');
-      const emailInput = document.getElementById('email');
-      if (nameInput) {
-        nameInput.value = user.displayName || user.email.split('@')[0];
-        nameInput.readOnly = true;
-        nameInput.style.background = '#f5f5f5';
-      }
-      if (emailInput) {
-        emailInput.value = user.email;
-        emailInput.readOnly = true;
-        emailInput.style.background = '#f5f5f5';
-      }
+  // Initialize Firebase auth when ready
+  function initializeApplyAuth() {
+    if (typeof FirebaseAuth === 'undefined') {
+      console.error('Firebase not loaded. Make sure firebase-config.js is included.');
+      return;
     }
-  });
+    
+    const { auth, onAuthStateChanged } = FirebaseAuth;
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        isLoggedIn = false;
+        if (loginMsg) loginMsg.style.display = 'block';
+        if (form) {
+          Array.from(form.elements).forEach(el => el.disabled = true);
+        }
+      } else {
+        isLoggedIn = true;
+        if (loginMsg) loginMsg.style.display = 'none';
+        if (form) {
+          Array.from(form.elements).forEach(el => el.disabled = false);
+        }
+        // Autofill name and email
+        const nameInput = document.getElementById('name');
+        const emailInput = document.getElementById('email');
+        if (nameInput) {
+          nameInput.value = user.displayName || user.email.split('@')[0];
+          nameInput.readOnly = true;
+          nameInput.style.background = '#f5f5f5';
+        }
+        if (emailInput) {
+          emailInput.value = user.email;
+          emailInput.readOnly = true;
+          emailInput.style.background = '#f5f5f5';
+        }
+      }
+    });
+  }
+
+  // Check if Firebase is already loaded
+  if (typeof FirebaseAuth !== 'undefined') {
+    initializeApplyAuth();
+  } else {
+    // Listen for Firebase ready event
+    window.addEventListener('firebaseReady', initializeApplyAuth);
+    window.addEventListener('firebaseError', (event) => {
+      console.error('Firebase initialization failed:', event.detail);
+    });
+  }
 
   // If not logged in, flash message if user tries to type
   if (form) {

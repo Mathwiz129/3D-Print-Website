@@ -18,12 +18,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof FirebaseAuth !== 'undefined') {
                     checkFirebaseAuthStatus();
                 } else {
-                    // If Firebase isn't loaded yet, wait a bit and try again
-                    setTimeout(() => {
-                        if (typeof FirebaseAuth !== 'undefined') {
-                            checkFirebaseAuthStatus();
-                        }
-                    }, 1000);
+                    // Listen for Firebase ready event
+                    window.addEventListener('firebaseReady', () => {
+                        checkFirebaseAuthStatus();
+                    });
+                    window.addEventListener('firebaseError', (event) => {
+                        console.error('Firebase initialization failed:', event.detail);
+                    });
                 }
             })
             .catch(error => {

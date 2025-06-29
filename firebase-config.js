@@ -54,8 +54,13 @@ async function initializeFirebase() {
         // Initialize materials helpers after Firebase is ready
         initializeMaterialsHelpers();
         
+        // Dispatch custom event to signal Firebase is ready
+        window.dispatchEvent(new CustomEvent('firebaseReady'));
+        
     } catch (error) {
         console.error('Failed to initialize Firebase:', error);
+        // Dispatch error event
+        window.dispatchEvent(new CustomEvent('firebaseError', { detail: error }));
     }
 }
 

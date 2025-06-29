@@ -1,25 +1,39 @@
 // Account Page JavaScript
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait for Firebase to be loaded
-    if (typeof FirebaseAuth === 'undefined') {
-        console.error('Firebase not loaded. Make sure firebase-config.js is included.');
-        return;
+    // Initialize account functionality when Firebase is ready
+    function initializeAccount() {
+        // Wait for Firebase to be loaded
+        if (typeof FirebaseAuth === 'undefined') {
+            console.error('Firebase not loaded. Make sure firebase-config.js is included.');
+            return;
+        }
+
+        const { auth, onAuthStateChanged } = FirebaseAuth;
+        
+        // Listen for authentication state changes
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in, load account information
+                console.log('User is signed in:', user.email);
+                loadAccountInformation(user);
+            } else {
+                // User is signed out, redirect to login
+                console.log('User is signed out, redirecting to login');
+                window.location.href = 'login.html';
+            }
+        });
     }
 
-    const { auth, onAuthStateChanged } = FirebaseAuth;
-    
-    // Listen for authentication state changes
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            // User is signed in, load account information
-            console.log('User is signed in:', user.email);
-            loadAccountInformation(user);
-        } else {
-            // User is signed out, redirect to login
-            console.log('User is signed out, redirecting to login');
-            window.location.href = 'login.html';
-        }
-    });
+    // Check if Firebase is already loaded
+    if (typeof FirebaseAuth !== 'undefined') {
+        initializeAccount();
+    } else {
+        // Listen for Firebase ready event
+        window.addEventListener('firebaseReady', initializeAccount);
+        window.addEventListener('firebaseError', (event) => {
+            console.error('Firebase initialization failed:', event.detail);
+        });
+    }
 });
 
 // Load and display account information
