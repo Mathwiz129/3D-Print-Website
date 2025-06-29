@@ -19,6 +19,9 @@ import random
 app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
 
+# Get price multiplier from environment variable, default to 1.0 for local development
+PRICE_MULTIPLIER = float(os.environ.get('PRICE_MULTIPLIER', '1.0'))
+
 # Initialize Firebase Admin SDK (if not already done)
 if not firebase_admin._apps:
     try:
@@ -326,6 +329,10 @@ def upload_stl():
         
         try:
             # Use wall+infill volume calculation
+            print("Attempting to load trimesh...")
+            import trimesh
+            print("Trimesh imported successfully")
+            
             result = calculate_wall_and_infill_volume(
                 temp_path,
                 infill=infill,
@@ -352,21 +359,41 @@ def upload_stl():
             })
         except Exception as e:
             print("Error in wall+infill volume calculation:", str(e))
-            # Fallback to estimation
-            file_size = os.path.getsize(temp_path)
-            estimated_volume = file_size / 1000
+            import traceback
+            traceback.print_exc()
+            
+            # Better fallback: try to load the mesh and get basic volume info
+            try:
+                print("Attempting fallback volume calculation...")
+                mesh = trimesh.load(temp_path)
+                if mesh.is_watertight:
+                    total_volume_mm3 = abs(mesh.volume)
+                    total_volume_cm3 = total_volume_mm3 / 1000.0
+                    print(f"Fallback: Using basic trimesh volume: {total_volume_cm3} cm³")
+                else:
+                    # If mesh is not watertight, estimate from bounding box
+                    extents = mesh.extents
+                    estimated_volume_cm3 = (extents[0] * extents[1] * extents[2]) / 1000.0
+                    print(f"Fallback: Using bounding box estimation: {estimated_volume_cm3} cm³")
+                    total_volume_cm3 = estimated_volume_cm3
+            except Exception as fallback_error:
+                print(f"Fallback calculation also failed: {fallback_error}")
+                # Last resort: use a reasonable default for a typical small part
+                total_volume_cm3 = 10.0  # 10 cm³ as a reasonable default
+                print(f"Using default volume: {total_volume_cm3} cm³")
+            
             return jsonify({
                 'success': True,
-                'materialVolume': estimated_volume,
-                'totalVolume': estimated_volume,
-                'shellVolume': 0,
-                'innerVolume': 0,
-                'shellWeight': 0,
-                'infillWeight': 0,
-                'totalWeight': 0,
+                'materialVolume': total_volume_cm3 * 0.3,  # Assume 30% material usage
+                'totalVolume': total_volume_cm3,
+                'shellVolume': total_volume_cm3 * 0.1,  # Assume 10% shell
+                'innerVolume': total_volume_cm3 * 0.9,  # Assume 90% inner
+                'shellWeight': total_volume_cm3 * 0.1 * 1.24,  # Assume PLA density
+                'infillWeight': total_volume_cm3 * 0.9 * infill * 1.24,
+                'totalWeight': total_volume_cm3 * 0.3 * 1.24,
                 'filename': file.filename,
-                'calculationMethod': f'Estimated (wall+infill failed)',
-                'warning': 'Volume calculation failed, using estimation'
+                'calculationMethod': f'Fallback estimation (trimesh failed: {str(e)[:100]})',
+                'warning': 'Volume calculation failed, using fallback estimation'
             })
         finally:
             # Clean up temporary file
@@ -448,7 +475,7 @@ def calculate_cost():
         material_volume = shell_volume + (inner_volume * infill)
         weight_grams = material_volume * density
    
-        cost = weight_grams * price_per_gram * 3.5
+        cost = weight_grams * price_per_gram * PRICE_MULTIPLIER
 
         print(f"=== Slicer-Style Calculation ===")
         print(f"Total volume: {total_volume} cm³")
@@ -463,6 +490,8 @@ def calculate_cost():
         print(f"Infill percentage received: {infill * 100}%")
         print(f"Material volume calculation: {shell_volume} + ({inner_volume} × {infill * 100}%) = {material_volume} cm³")
         print(f"Weight: {weight_grams}g")
+        print(f"Price per gram: ${price_per_gram}")
+        print(f"Price multiplier: {PRICE_MULTIPLIER}")
         print(f"Cost: ${cost}")
         
         # Simple test to verify infill impact
@@ -845,6 +874,41 @@ def send_order_confirmation_email(order_data):
         
     except Exception as e:
         print(f"Error creating confirmation email: {e}")
+
+@app.route('/test-trimesh')
+def test_trimesh():
+    """Test endpoint to check if trimesh is working properly"""
+    try:
+        import trimesh
+        print("Trimesh imported successfully")
+        
+        # Create a simple test cube
+        vertices = [[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0],
+                   [0, 0, 10], [10, 0, 10], [10, 10, 10], [0, 10, 10]]
+        faces = [[0, 1, 2], [0, 2, 3], [4, 7, 6], [4, 6, 5],
+                [0, 4, 5], [0, 5, 1], [1, 5, 6], [1, 6, 2],
+                [2, 6, 7], [2, 7, 3], [3, 7, 4], [3, 4, 0]]
+        
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+        volume = mesh.volume
+        
+        return jsonify({
+            'success': True,
+            'trimesh_version': trimesh.__version__,
+            'test_volume': volume,
+            'expected_volume': 1000.0,
+            'is_watertight': mesh.is_watertight,
+            'bounds': mesh.bounds.tolist(),
+            'extents': mesh.extents.tolist()
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

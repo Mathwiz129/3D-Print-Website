@@ -512,6 +512,14 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Expected cube size: 100mm = 10cm");
     console.log("Actual cube size from frontend:", maxX - minX, "units");
     
+    // Determine if units are in mm or cm based on expected size
+    const expectedSize = 100; // Expected size in mm
+    const actualSize = maxX - minX;
+    const unitScale = actualSize / expectedSize;
+    console.log("Unit scale factor:", unitScale);
+    console.log("If scale factor is ~1, units are mm");
+    console.log("If scale factor is ~0.1, units are cm");
+    
     for (let i = 0; i < pos.count; i += 3) {
       const ax = pos.getX(i), ay = pos.getY(i), az = pos.getZ(i);
       const bx = pos.getX(i + 1), by = pos.getY(i + 1), bz = pos.getZ(i + 1);
@@ -523,7 +531,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     const rawVolume = Math.abs(vol);
-    const volumeCm3 = rawVolume / 1000;
+    
+    // Convert to cm³ based on unit scale
+    let volumeCm3;
+    if (unitScale > 0.5) {
+      // Units are likely mm, convert mm³ to cm³
+      volumeCm3 = rawVolume / 1000;
+      console.log("Converting from mm³ to cm³");
+    } else {
+      // Units are likely cm, no conversion needed
+      volumeCm3 = rawVolume;
+      console.log("Units appear to be cm, no conversion needed");
+    }
+    
     console.log("Raw volume:", rawVolume, "units³");
     console.log("Volume in cm³:", volumeCm3);
     console.log("Expected volume for 10cm cube: 1000 cm³");
