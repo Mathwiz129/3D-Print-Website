@@ -1,32 +1,39 @@
-const express = require('express');
+const { spawn } = require('child_process');
 const path = require('path');
 
-const app = express();
-const PORT = 8080;
+console.log('🚀 Starting local development server...');
+console.log('📁 Working directory:', process.cwd());
 
-// Serve static files
-app.use(express.static(__dirname));
-
-// Handle all routes by serving index.html (for SPA-like behavior)
-app.get('*', (req, res) => {
-    // Check if the request is for a specific HTML file
-    if (req.path.endsWith('.html')) {
-        res.sendFile(path.join(__dirname, req.path));
-    } else {
-        // For other routes, serve index.html
-        res.sendFile(path.join(__dirname, 'index.html'));
+// Start Flask development server
+const flaskProcess = spawn('python', ['app.py'], {
+    stdio: 'inherit',
+    env: {
+        ...process.env,
+        FLASK_ENV: 'development',
+        FLASK_DEBUG: '1',
+        PORT: '5000'
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Development server running at http://localhost:${PORT}`);
-    console.log(`📁 Serving files from: ${__dirname}`);
-    console.log(`🔥 Firebase should now work properly!`);
-    console.log(`\n📋 Available pages:`);
-    console.log(`   - Home: http://localhost:${PORT}/`);
-    console.log(`   - Login: http://localhost:${PORT}/login.html`);
-    console.log(`   - Signup: http://localhost:${PORT}/signup.html`);
-    console.log(`   - About: http://localhost:${PORT}/about.html`);
-    console.log(`   - Apply: http://localhost:${PORT}/apply.html`);
-    console.log(`   - Orders: http://localhost:${PORT}/orders.html`);
+flaskProcess.on('error', (error) => {
+    console.error('❌ Failed to start Flask server:', error.message);
+    console.log('💡 Make sure you have Python and the required packages installed:');
+    console.log('   pip install -r requirements.txt');
+    process.exit(1);
+});
+
+flaskProcess.on('close', (code) => {
+    console.log(`\n🔚 Flask server exited with code ${code}`);
+    process.exit(code);
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+    console.log('\n🛑 Shutting down development server...');
+    flaskProcess.kill('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Shutting down development server...');
+    flaskProcess.kill('SIGTERM');
 }); 

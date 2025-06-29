@@ -1,6 +1,67 @@
 // Admin Page Material Management (no admin check for now)
 
-// (import statement removed)
+// Global application management functions
+window.acceptApplication = function(appId) {
+  fetch(`/api/admin/applications/${appId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'accepted' })
+  })
+    .then(res => res.json())
+    .then(() => {
+      // Refresh the applications section
+      if (window.renderAdminApplicationsSection) {
+        window.renderAdminApplicationsSection();
+      } else {
+        location.reload();
+      }
+    })
+    .catch(err => {
+      console.error('Error accepting application:', err);
+      alert('Failed to accept application. Please try again.');
+    });
+};
+
+window.denyApplication = function(appId) {
+  fetch(`/api/admin/applications/${appId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'denied' })
+  })
+    .then(res => res.json())
+    .then(() => {
+      // Refresh the applications section
+      if (window.renderAdminApplicationsSection) {
+        window.renderAdminApplicationsSection();
+      } else {
+        location.reload();
+      }
+    })
+    .catch(err => {
+      console.error('Error denying application:', err);
+      alert('Failed to deny application. Please try again.');
+    });
+};
+
+window.deleteApplication = function(appId) {
+  if (!confirm('Are you sure you want to delete this application? This cannot be undone.')) return;
+  fetch(`/api/admin/applications/${appId}`, {
+    method: 'DELETE'
+  })
+    .then(res => res.json())
+    .then(() => {
+      // Refresh the applications section
+      if (window.renderAdminApplicationsSection) {
+        window.renderAdminApplicationsSection();
+      } else {
+        location.reload();
+      }
+    })
+    .catch(err => {
+      console.error('Error deleting application:', err);
+      alert('Failed to delete application. Please try again.');
+    });
+};
 
 document.addEventListener('DOMContentLoaded', function() {
   const adminContent = document.getElementById('admin-content');
@@ -24,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showAdminMaterialEditor = showAdminMaterialEditor;
   window.editAdminMaterial = editAdminMaterial;
   window.deleteAdminMaterial = deleteAdminMaterial;
+  window.renderAdminApplicationsSection = renderAdminApplicationsSection;
 
   function renderAdminAddMaterialForm() {
     const container = document.getElementById('admin-add-material');
@@ -261,33 +323,4 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('admin-applications-list').innerHTML = '<div class="error">Failed to load applications.</div>';
       });
   }
-
-  window.acceptApplication = function(appId) {
-    fetch(`/api/admin/applications/${appId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'accepted' })
-    })
-      .then(res => res.json())
-      .then(() => renderAdminApplicationsSection());
-  };
-
-  window.denyApplication = function(appId) {
-    fetch(`/api/admin/applications/${appId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'denied' })
-    })
-      .then(res => res.json())
-      .then(() => renderAdminApplicationsSection());
-  };
-
-  window.deleteApplication = function(appId) {
-    if (!confirm('Are you sure you want to delete this application? This cannot be undone.')) return;
-    fetch(`/api/admin/applications/${appId}`, {
-      method: 'DELETE'
-    })
-      .then(res => res.json())
-      .then(() => renderAdminApplicationsSection());
-  };
 }); 

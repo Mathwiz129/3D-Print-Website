@@ -14,6 +14,7 @@ import struct
 import math
 import trimesh
 import requests
+import random
 
 app = Flask(__name__)
 CORS(app)  # Allows cross-origin requests from your frontend
@@ -658,25 +659,41 @@ def admin_update_or_delete_application(app_id):
 @app.route('/api/firebase-config')
 def get_firebase_config():
     """Serve Firebase config from environment variables"""
-    config = {
-        "apiKey": os.environ.get('FIREBASE_API_KEY'),
-        "authDomain": os.environ.get('FIREBASE_AUTH_DOMAIN'),
-        "projectId": os.environ.get('FIREBASE_PROJECT_ID'),
-        "storageBucket": os.environ.get('FIREBASE_STORAGE_BUCKET'),
-        "messagingSenderId": os.environ.get('FIREBASE_MESSAGING_SENDER_ID'),
-        "appId": os.environ.get('FIREBASE_APP_ID'),
-        "measurementId": os.environ.get('FIREBASE_MEASUREMENT_ID')
-    }
+    # For local development, use hardcoded config if env vars aren't set
+    if os.environ.get('FIREBASE_API_KEY'):
+        # Production/Deployment: Use environment variables
+        config = {
+            "apiKey": os.environ.get('FIREBASE_API_KEY'),
+            "authDomain": os.environ.get('FIREBASE_AUTH_DOMAIN'),
+            "projectId": os.environ.get('FIREBASE_PROJECT_ID'),
+            "storageBucket": os.environ.get('FIREBASE_STORAGE_BUCKET'),
+            "messagingSenderId": os.environ.get('FIREBASE_MESSAGING_SENDER_ID'),
+            "appId": os.environ.get('FIREBASE_APP_ID'),
+            "measurementId": os.environ.get('FIREBASE_MEASUREMENT_ID')
+        }
+    else:
+        # Local development: Use hardcoded config (safe for local testing)
+        config = {
+            "apiKey": "AIzaSyAbUwgBItOT4kOnUnsliHpMgNI7ONQuAqA",
+            "authDomain": "outprint-3d-printing.firebaseapp.com",
+            "projectId": "outprint-3d-printing",
+            "storageBucket": "outprint-3d-printing.firebasestorage.app",
+            "messagingSenderId": "11337273606",
+            "appId": "1:11337273606:web:3daa9f8f673cae76c30e87",
+            "measurementId": "G-9G95YJB9LH"
+        }
     return jsonify(config)
 
 @app.route('/api/sheets-data')
 def get_sheets_data():
     """Fetch Google Sheets data securely from backend"""
     sheet_id = "1H6XhzxP4rr6gXOBdhGBhIory9gBKWudl2FD7p8cdgrU"
-    api_key = os.environ.get('GOOGLE_SHEETS_API_KEY')
     
+    # For local development, use hardcoded API key if env var isn't set
+    api_key = os.environ.get('GOOGLE_SHEETS_API_KEY')
     if not api_key:
-        return jsonify({'error': 'Google Sheets API key not configured'}), 500
+        # Local development: Use hardcoded API key (safe for local testing)
+        api_key = "AIzaSyBhJmoT7U_-R_ewsOs2E0uTqC_1IXIbQC0"
     
     url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A2:B2?alt=json&key={api_key}"
     
@@ -695,6 +712,139 @@ def get_sheets_data():
             
     except requests.RequestException as e:
         return jsonify({'error': f'Failed to fetch sheet data: {str(e)}'}), 500
+
+@app.route('/api/orders', methods=['GET', 'POST'])
+def handle_orders():
+    """Handle orders - GET for retrieving user orders, POST for submitting new orders"""
+    
+    if request.method == 'POST':
+        """Submit a new order"""
+        try:
+            order_data = request.json
+            
+            if not order_data:
+                return jsonify({'error': 'No order data provided'}), 400
+            
+            # Validate required fields
+            required_fields = ['customer', 'shipping', 'items', 'total']
+            for field in required_fields:
+                if field not in order_data:
+                    return jsonify({'error': f'Missing required field: {field}'}), 400
+            
+            # Add order metadata
+            order_data['createdAt'] = datetime.now().isoformat()
+            order_data['status'] = 'pending'
+            order_data['orderNumber'] = order_data.get('orderNumber', generate_order_number())
+            
+            # Save to Firestore if available
+            if db:
+                try:
+                    # Add to orders collection
+                    order_ref = db.collection('orders').add(order_data)
+                    order_data['firestoreId'] = order_ref[1].id
+                    
+                    # Also save to user's orders if user is logged in
+                    if 'userId' in order_data:
+                        user_orders_ref = db.collection('users').document(order_data['userId']).collection('orders').add(order_data)
+                        order_data['userOrderId'] = user_orders_ref[1].id
+                    
+                    print(f"Order saved to Firestore: {order_data['orderNumber']}")
+                    
+                except Exception as e:
+                    print(f"Error saving order to Firestore: {e}")
+                    # Continue without Firestore if it fails
+            
+            # Send confirmation email (if email service is configured)
+            try:
+                send_order_confirmation_email(order_data)
+            except Exception as e:
+                print(f"Error sending confirmation email: {e}")
+                # Continue without email if it fails
+            
+            return jsonify({
+                'success': True,
+                'orderNumber': order_data['orderNumber'],
+                'message': 'Order submitted successfully'
+            })
+            
+        except Exception as e:
+            print(f"Error processing order: {e}")
+            return jsonify({'error': 'Failed to process order'}), 500
+    
+    elif request.method == 'GET':
+        """Get orders for the current user"""
+        try:
+            # Get user ID from query parameter or header
+            user_id = request.args.get('userId') or request.headers.get('X-User-ID')
+            
+            if not user_id:
+                return jsonify({'error': 'User ID required'}), 400
+            
+            if not db:
+                return jsonify({'error': 'Database not available'}), 500
+            
+            # Get orders from Firestore
+            try:
+                # Get orders from user's orders subcollection
+                user_orders_ref = db.collection('users').document(user_id).collection('orders')
+                orders = []
+                
+                for doc in user_orders_ref.stream():
+                    order_data = doc.to_dict()
+                    order_data['id'] = doc.id
+                    orders.append(order_data)
+                
+                # Sort by creation date (newest first)
+                orders.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
+                
+                return jsonify({
+                    'success': True,
+                    'orders': orders,
+                    'count': len(orders)
+                })
+                
+            except Exception as e:
+                print(f"Error fetching orders from Firestore: {e}")
+                return jsonify({'error': 'Failed to fetch orders'}), 500
+                
+        except Exception as e:
+            print(f"Error in get_user_orders: {e}")
+            return jsonify({'error': 'Failed to get orders'}), 500
+
+def generate_order_number():
+    """Generate a unique order number"""
+    timestamp = str(int(datetime.now().timestamp()))
+    random_suffix = str(random.randint(100, 999))
+    return f"ORD{timestamp[-6:]}{random_suffix}"
+
+def send_order_confirmation_email(order_data):
+    """Send order confirmation email"""
+    try:
+        customer_email = order_data['customer']['email']
+        order_number = order_data['orderNumber']
+        total = order_data['total']
+        
+        # Create email content
+        subject = f"Order Confirmation - {order_number}"
+        body = f"""
+        Thank you for your order!
+        
+        Order Number: {order_number}
+        Total: ${total:.2f}
+        
+        We'll start processing your 3D prints right away. You'll receive updates as your order progresses.
+        
+        Best regards,
+        The Outprint Team
+        """
+        
+        # For now, just log the email (you can implement actual email sending later)
+        print(f"Would send confirmation email to {customer_email}:")
+        print(f"Subject: {subject}")
+        print(f"Body: {body}")
+        
+    except Exception as e:
+        print(f"Error creating confirmation email: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

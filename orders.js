@@ -91,10 +91,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Initialize configuration
-  loadConfiguration().then(() => {
-    // You can enable/disable upload UI here if needed
-  });
+  // Initialize configuration when Firebase is ready
+  function initializeOrders() {
+    // Check if Firebase is already loaded
+    if (typeof window.MaterialsFirestore !== 'undefined') {
+      loadConfiguration().then(() => {
+        // You can enable/disable upload UI here if needed
+      });
+    } else {
+      // Listen for Firebase ready event
+      window.addEventListener('firebaseReady', () => {
+        loadConfiguration().then(() => {
+          // You can enable/disable upload UI here if needed
+        });
+      });
+      window.addEventListener('firebaseError', (event) => {
+        console.error('Firebase initialization failed:', event.detail);
+      });
+    }
+  }
+
+  // Initialize orders functionality
+  initializeOrders();
 
   // Helper: get unique material names
   function getUniqueMaterialNames() {
@@ -738,7 +756,9 @@ document.addEventListener("DOMContentLoaded", () => {
           cardName: document.getElementById('cardName').value
         },
         items: [],
-        total: 0
+        total: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString()
       };
 
       // Collect items
@@ -770,21 +790,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Generate order number
       const orderNumber = generateOrderNumber();
+      orderData.orderNumber = orderNumber;
+      
+      // Save order to Firestore
+      try {
+        if (window.FirebaseDB && window.FirebaseAuth) {
+          const { db, collection, addDoc } = window.FirebaseDB;
+          const { auth } = window.FirebaseAuth;
+          
+          // Add user ID if logged in
+          if (auth.currentUser) {
+            orderData.userId = auth.currentUser.uid;
+            orderData.userEmail = auth.currentUser.email;
+          }
+          
+          const orderRef = await addDoc(collection(db, 'orders'), orderData);
+          console.log('Order saved to Firestore with ID:', orderRef.id);
+        }
+      } catch (firestoreError) {
+        console.error('Error saving to Firestore:', firestoreError);
+        // Continue with order processing even if Firestore fails
+      }
+
+      // Send order to backend API
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Order sent to backend:', result);
+      } catch (apiError) {
+        console.error('Error sending order to backend:', apiError);
+        // Continue even if backend fails - order is already saved to Firestore
+      }
       
       // Show success modal
       document.getElementById('orderNumber').textContent = `Order #${orderNumber}`;
       checkoutModal.style.display = "none";
       successModal.style.display = "flex";
 
-      // In a real implementation, you would save the order to your database here
-      console.log('Order placed:', orderData);
-      
-      // You could also send the order data to your backend
-      // await fetch('/api/orders', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(orderData)
-      // });
+      console.log('Order placed successfully:', orderData);
 
     } catch (error) {
       console.error('Error processing order:', error);
