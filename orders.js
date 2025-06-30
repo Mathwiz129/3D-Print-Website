@@ -138,6 +138,12 @@ document.addEventListener("DOMContentLoaded", () => {
     return materials.find(m => m.name === name && (m.colors || []).some(c => c.hex === colorHex));
   }
 
+  // Helper: get material density by name
+  function getMaterialDensity(materialName) {
+    const material = materials.find(m => m.name === materialName);
+    return material ? material.density : 1.24; // Default to PLA density
+  }
+
   // Modal event listeners for delete confirmation
   document.getElementById("cancelDelete").addEventListener("click", () => {
     document.getElementById("confirmModal").style.display = "none";
@@ -308,19 +314,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // Set up delete action for this card
     card.querySelector(".delete-btn").addEventListener("click", () => confirmDelete(card));
 
+    // Store the STL file reference in the card for API calls
+    card._stlFile = file;
+
     // Initialize the Three.js viewer for this part
-    renderViewer(file, document.getElementById(`${id}-viewer`), (volume, mesh) => {
-      card.dataset.volume = volume;
-      card.mesh = mesh; // Store mesh reference as property
-      mesh.userData.card = card; // Store card reference in mesh for calculation method updates
-      updateCard(card);
+    renderViewer(file, document.getElementById(`${id}-viewer`), (mesh) => {
+      card._mesh = mesh;
+      // Trigger initial weight calculation when mesh is ready
+      calculateWeightWithAPI(card);
     });
 
     // Material and color dropdowns
     const materialSelect = card.querySelector('.material');
     const colorSelect = card.querySelector('.color');
 
-    // When material changes, update color options
+    // When material changes, update color options and recalculate
     materialSelect.addEventListener('change', function() {
       const selectedMaterial = this.value;
       // Update color dropdown
@@ -330,11 +338,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // Reset color selection
       colorSelect.value = '';
       colorSelect.classList.add('required-color');
-      updateCard(card);
+      // Recalculate weight with new material density
+      calculateWeightWithAPI(card);
       updateMeshColor(card);
     });
 
-    // When color changes, update mesh color
+    // When color changes, update mesh color and recalculate
     colorSelect.addEventListener('change', function() {
       if (!this.value) {
         this.classList.add('required-color');
@@ -342,235 +351,90 @@ document.addEventListener("DOMContentLoaded", () => {
         this.classList.remove('required-color');
       }
       updateMeshColor(card);
-      updateCard(card);
+      calculateWeightWithAPI(card);
     });
 
-    // Recalculate whenever any control changes
-    card.querySelectorAll("select, input").forEach((input) => 
-      input.addEventListener("input", () => {
-        console.log("Input changed:", input.className, input.value);
-        updateCard(card);
-        if (input.classList.contains('color')) updateMeshColor(card);
-      })
-    );
-
-    // Add specific event listener for infill input
+    // When infill changes, recalculate weight
     const infillInput = card.querySelector(".infill");
     if (infillInput) {
       infillInput.addEventListener("change", () => {
         console.log("Infill changed to:", infillInput.value);
-        updateCard(card);
-      });
-      infillInput.addEventListener("input", () => {
-        console.log("Infill input event:", infillInput.value);
-        updateCard(card);
+        calculateWeightWithAPI(card);
       });
     }
 
-    if (!colorSelect.value) colorSelect.classList.add('required-color');
-    if (!materialSelect.value) materialSelect.classList.add('required');
-  }
-
-  // Render the STL file into a Three.js viewer within a given container
-  function renderViewer(file, container, cb) {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-    camera.position.set(0, 100, 200);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setClearColor(0xf0f0f0); // Light gray background
-    container.innerHTML = "";
-    container.appendChild(renderer.domElement);
-
-    // Add lighting and a grid helper
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(0, 1, 1).normalize();
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x888888));
-    scene.add(new THREE.GridHelper(200, 20, "#666666", "#888888")); // Darker gray grid lines
-
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const loader = new THREE.STLLoader();
-      const geometry = loader.parse(e.target.result);
-
-      // Center and ground the geometry
-      geometry.computeBoundingBox();
-      const box = geometry.boundingBox;
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      const yOffset = box.min.y;
-      geometry.translate(-center.x, -yOffset, -center.z);
-
-      const mat = new THREE.MeshPhongMaterial({ color: 0xe6642e });
-      const mesh = new THREE.Mesh(geometry, mat);
-      scene.add(mesh);
-
-      // Calculate volume using Three.js (fallback)
-      const volume = computeVolume(geometry);
-      
-      // Also try to upload to backend for MeshLab calculation
-      uploadSTLForMeshLabCalculation(file, volume, cb, mesh);
-
-      animate();
-    };
-    reader.readAsArrayBuffer(file);
-
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
+    // When quantity changes, update cost display
+    const qtyInput = card.querySelector(".qty");
+    if (qtyInput) {
+      qtyInput.addEventListener("change", () => {
+        updateCardCost(card);
+      });
     }
   }
 
-  // Upload STL file to backend for wall+infill calculation
-  async function uploadSTLForMeshLabCalculation(file, fallbackVolume, cb, mesh) {
+  // NEW: Calculate weight using the STL Weight Estimator API
+  async function calculateWeightWithAPI(card) {
+    const stlFile = card._stlFile;
+    const materialName = card.querySelector(".material").value;
+    const infillPercentage = parseFloat(card.querySelector(".infill").value) || 20;
+    
+    if (!stlFile || !materialName) {
+      console.log("Missing STL file or material selection");
+      return;
+    }
+
+    // Get material density from Firestore
+    const materialDensity = getMaterialDensity(materialName);
+    
+    console.log(`Calculating weight: material=${materialName}, infill=${infillPercentage}%, density=${materialDensity}g/cm³`);
+
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      // Optionally, add wallThickness, infill, correctionFactor, density here if you want user control
-      // formData.append('wallThickness', ...);
-      // formData.append('infill', ...);
-      // formData.append('correctionFactor', ...);
-      // formData.append('density', ...);
+      formData.append('file', stlFile);
+      formData.append('infill_percentage', infillPercentage);
+      formData.append('material_density', materialDensity);
+      formData.append('line_thickness', 0.2); // Hard-coded as requested
+      formData.append('layer_height', 0.2);   // Hard-coded as requested
+      formData.append('shell_count', 2);      // Hard-coded as requested
 
-      const response = await fetch('/upload-stl', {
+      const response = await fetch('https://stl-api-66l8.onrender.com/estimate-weight', {
         method: 'POST',
         body: formData
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log("STL upload response:", result);
-        if (result.success) {
-          // Store all backend-calculated values on the card for later use
-          const card = mesh.userData.card;
-          if (card) {
-            console.log("STL upload result:", result);
-            card.dataset.materialVolume = result.materialVolume;
-            card.dataset.shellWeight = result.shellWeight;
-            card.dataset.infillWeight = result.infillWeight;
-            card.dataset.totalWeight = result.totalWeight;
-            card.dataset.shellVolume = result.shellVolume;
-            card.dataset.innerVolume = result.innerVolume;
-            card.dataset.totalVolume = result.totalVolume;
-            console.log("Stored shellVolume:", card.dataset.shellVolume);
-            console.log("Stored innerVolume:", card.dataset.innerVolume);
-            console.log("Stored materialVolume:", card.dataset.materialVolume);
-            
-            // Trigger a cost recalculation with the new data
-            setTimeout(() => updateCard(card), 100);
-          }
-          // Use backend material volume for cost calculation
-          cb(parseFloat(result.materialVolume), mesh);
-        } else {
-          console.log("STL upload failed, using fallback");
-          cb(fallbackVolume, mesh);
-        }
+        console.log("API Response:", result);
+        
+        // Store the weight and volume data
+        card.dataset.weight = result.weight_grams;
+        card.dataset.totalVolume = result.total_volume_cm3;
+        card.dataset.solidVolume = result.solid_volume_cm3;
+        card.dataset.infillVolume = result.infill_volume_cm3;
+        card.dataset.shellVolume = result.shell_volume_cm3;
+        
+        console.log("Updated weight:", result.weight_grams, "grams");
+        
+        // Update the cost display
+        updateCardCost(card);
       } else {
-        console.log("STL upload HTTP error, using fallback");
-        cb(fallbackVolume, mesh);
+        console.error("API Error:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error details:", errorText);
       }
     } catch (error) {
-      cb(fallbackVolume, mesh);
+      console.error("Error calculating weight:", error);
     }
   }
 
-  // Compute volume from the STL geometry (in cm³)
-  function computeVolume(geometry) {
-    let vol = 0;
-    const pos = geometry.attributes.position;
-    console.log("=== Frontend Volume Calculation Debug ===");
-    console.log("Number of vertices:", pos.count);
-    console.log("First few vertices:", {
-      v1: [pos.getX(0), pos.getY(0), pos.getZ(0)],
-      v2: [pos.getX(1), pos.getY(1), pos.getZ(1)],
-      v3: [pos.getX(2), pos.getY(2), pos.getZ(2)]
-    });
-    
-    // Calculate bounding box
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
-    }
-    
-    console.log("Bounding box:", {
-      min: [minX, minY, minZ],
-      max: [maxX, maxY, maxZ],
-      extents: [maxX - minX, maxY - minY, maxZ - minZ]
-    });
-    console.log("Expected cube size: 100mm = 10cm");
-    console.log("Actual cube size from frontend:", maxX - minX, "units");
-    
-    // Determine if units are in mm or cm based on expected size
-    const expectedSize = 100; // Expected size in mm
-    const actualSize = maxX - minX;
-    const unitScale = actualSize / expectedSize;
-    console.log("Unit scale factor:", unitScale);
-    console.log("If scale factor is ~1, units are mm");
-    console.log("If scale factor is ~0.1, units are cm");
-    
-    for (let i = 0; i < pos.count; i += 3) {
-      const ax = pos.getX(i), ay = pos.getY(i), az = pos.getZ(i);
-      const bx = pos.getX(i + 1), by = pos.getY(i + 1), bz = pos.getZ(i + 1);
-      const cx = pos.getX(i + 2), cy = pos.getY(i + 2), cz = pos.getZ(i + 2);
-      vol += (1 / 6) * (
-        -cx * by * az + bx * cy * az + cx * ay * bz
-        - ax * cy * bz - bx * ay * cz + ax * by * cz
-      );
-    }
-    
-    const rawVolume = Math.abs(vol);
-    
-    // Convert to cm³ based on unit scale
-    let volumeCm3;
-    if (unitScale > 0.5) {
-      // Units are likely mm, convert mm³ to cm³
-      volumeCm3 = rawVolume / 1000;
-      console.log("Converting from mm³ to cm³");
-    } else {
-      // Units are likely cm, no conversion needed
-      volumeCm3 = rawVolume;
-      console.log("Units appear to be cm, no conversion needed");
-    }
-    
-    console.log("Raw volume:", rawVolume, "units³");
-    console.log("Volume in cm³:", volumeCm3);
-    console.log("Expected volume for 10cm cube: 1000 cm³");
-    console.log("=== End Frontend Debug ===");
-    
-    return volumeCm3;
-  }
-
-  // Update the cost information on a part card using Firestore material data
-  async function updateCard(card) {
-    // Use backend-calculated values only; send all parameters to backend for robust calculation
+  // NEW: Update card cost based on weight and material price
+  async function updateCardCost(card) {
     const materialName = card.querySelector(".material").value;
     const colorHex = card.querySelector(".color").value;
-    let infill = parseFloat(card.querySelector(".infill").value) || 20;
-    if (infill < 0) infill = 0;
-    if (infill > 100) infill = 100;
-    console.log("updateCard called with infill:", infill);
     const qty = parseInt(card.querySelector(".qty").value) || 1;
-    const wallThickness = parseFloat(card.querySelector(".wall-thickness")?.value) || 1.2;
-    const layerHeight = parseFloat(card.querySelector(".layer-height")?.value) || 0.2;
-    const topBottomLayers = parseInt(card.querySelector(".top-bottom-layers")?.value) || 3;
-    const perimeters = parseInt(card.querySelector(".perimeters")?.value) || 2;
-    const totalVolume = card.dataset.totalVolume
-      ? parseFloat(card.dataset.totalVolume)
-      : parseFloat(card.dataset.volume || 0); // fallback if needed
+    const weight = parseFloat(card.dataset.weight) || 0;
 
-    if (!materialName || !colorHex || totalVolume === 0) {
+    if (!materialName || !colorHex || weight === 0) {
       card.querySelector(".price").textContent = "$0.00";
       card.querySelector(".cost").textContent = "$0.00";
       card.dataset.cost = 0;
@@ -588,40 +452,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // Send all parameters to backend for robust calculation
-      const requestData = {
-        material: materialName,
-        color: colorHex,
-        totalVolume: totalVolume,
-        infill: infill,
-        wallThickness: wallThickness,
-        layerHeight: layerHeight,
-        topBottomLayers: topBottomLayers,
-        perimeters: perimeters
-      };
-      console.log("Sending to backend:", requestData);
-      const response = await fetch('/calculate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      console.log("Backend response:", result);
-      const unit = result.cost;
-      console.log("Unit cost from backend:", unit);
+      // Calculate cost using weight and material price
+      const pricePerGram = materialObj.price;
+      const unitCost = weight * pricePerGram;
+      const totalCost = unitCost * qty;
+      
+      console.log(`Cost calculation: weight=${weight}g, price/g=${pricePerGram}, unit=${unitCost}, total=${totalCost}`);
+      
       const priceElem = card.querySelector(".price");
       const costElem = card.querySelector(".cost");
-      priceElem.textContent = `$${unit.toFixed(2)}`;
-      const total = unit * qty;
-      costElem.textContent = `$${total.toFixed(2)}`;
-      console.log("Updated price display to:", `$${unit.toFixed(2)}`);
-      console.log("Updated cost display to:", `$${total.toFixed(2)}`);
-      card.dataset.cost = total;
+      
+      priceElem.textContent = `$${unitCost.toFixed(2)}`;
+      costElem.textContent = `$${totalCost.toFixed(2)}`;
+      
+      card.dataset.cost = totalCost;
       updateSummary();
+      
       flashUpdate(priceElem);
       flashUpdate(costElem);
     } catch (error) {
@@ -645,77 +491,145 @@ document.addEventListener("DOMContentLoaded", () => {
     let grandTotalCost = 0;
 
     document.querySelectorAll(".part-card").forEach(card => {
-      const name = card.querySelector("h4") 
-        ? card.querySelector("h4").textContent 
-        : "Part";
-      const cost = parseFloat(card.dataset.cost || 0);
-      grandTotalCost += cost;
+      const name = card.querySelector("h4").textContent;
+      const cost = parseFloat(card.dataset.cost) || 0;
+      const qty = parseInt(card.querySelector(".qty").value) || 1;
+      const material = card.querySelector(".material").value;
+      const color = card.querySelector(".color").value;
+      const weight = parseFloat(card.dataset.weight) || 0;
 
-      const item = document.createElement("div");
-      item.className = "summary-item";
-      item.innerHTML = `<span>${name}</span><strong>$${cost.toFixed(2)}</strong>`;
-      summaryList.appendChild(item);
+      if (cost > 0) {
+        grandTotalCost += cost;
+        const summaryItem = document.createElement("div");
+        summaryItem.className = "summary-item";
+        summaryItem.innerHTML = `
+          <div class="summary-item-name">${name} (${qty}x)</div>
+          <div class="summary-item-details">
+            ${material} - ${weight.toFixed(1)}g
+          </div>
+          <div class="summary-item-price">$${cost.toFixed(2)}</div>
+        `;
+        summaryList.appendChild(summaryItem);
+      }
     });
 
     summaryTotal.textContent = `$${grandTotalCost.toFixed(2)}`;
-    
-    // Show/hide checkout button based on cart contents
-    if (grandTotalCost > 0) {
-      checkoutBtn.style.display = "flex";
-    } else {
-      checkoutBtn.style.display = "none";
-    }
+    checkoutBtn.style.display = grandTotalCost > 0 ? "flex" : "none";
   }
 
-  // Open the delete confirmation modal for a part card
   function confirmDelete(card) {
     deleteTarget = card;
     document.getElementById("confirmModal").style.display = "flex";
   }
 
-  // Update mesh color when color selection changes
   function updateMeshColor(card) {
-    const colorValue = card.querySelector('.color').value;
-    const mesh = card.mesh;
-    if (mesh && mesh.material && colorValue) {
-      mesh.material.color.set(colorValue);
+    const mesh = card._mesh;
+    const colorHex = card.querySelector(".color").value;
+    
+    if (mesh && colorHex) {
+      const color = new THREE.Color(colorHex);
+      mesh.material.color = color;
     }
   }
 
-  // Checkout Functions
+  // Three.js viewer setup
+  function renderViewer(file, container, cb) {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    
+    renderer.setSize(140, 140);
+    renderer.setClearColor(0xf0f0f0); // Light gray background
+    container.innerHTML = "";
+    container.appendChild(renderer.domElement);
+
+    // Add lighting and a grid helper
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(0, 1, 1).normalize();
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x888888));
+    scene.add(new THREE.GridHelper(200, 20, "#666666", "#888888")); // Darker gray grid lines
+
+    // Set up camera position for side angle view
+    camera.position.set(130, 130, 130);
+    camera.lookAt(0, 0, 0);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const loader = new THREE.STLLoader();
+      const geometry = loader.parse(e.target.result);
+
+      // Center and ground the geometry
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const yOffset = box.min.y;
+      geometry.translate(-center.x, -yOffset, -center.z);
+
+      const mat = new THREE.MeshPhongMaterial({ 
+        color: 0xe6642e,
+        transparent: false,
+        opacity: 1.0 // 100% opacity
+      });
+      const mesh = new THREE.Mesh(geometry, mat);
+      scene.add(mesh);
+
+      // Call callback with mesh
+      if (cb) cb(mesh);
+
+      animate();
+    };
+    reader.readAsArrayBuffer(file);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+  }
+
   function openCheckout() {
-    const parts = document.querySelectorAll(".part-card");
-    if (parts.length === 0) {
-      alert("Please add at least one part to your order.");
+    const items = [];
+    document.querySelectorAll(".part-card").forEach(card => {
+      const name = card.querySelector("h4").textContent;
+      const cost = parseFloat(card.dataset.cost) || 0;
+      const qty = parseInt(card.querySelector(".qty").value) || 1;
+      const material = card.querySelector(".material").value;
+      const color = card.querySelector(".color").value;
+      const weight = parseFloat(card.dataset.weight) || 0;
+
+      if (cost > 0) {
+        items.push({ name, cost, qty, material, color, weight });
+      }
+    });
+
+    if (items.length === 0) {
+      alert("Please add at least one item to your cart.");
       return;
     }
 
-    // Populate checkout items
+    // Populate checkout modal
     const checkoutItems = document.getElementById("checkoutItems");
     const checkoutTotal = document.getElementById("checkoutTotal");
-    checkoutItems.innerHTML = "";
     
+    checkoutItems.innerHTML = "";
     let total = 0;
-    parts.forEach(card => {
-      const name = card.querySelector("h4")?.textContent || "Part";
-      const cost = parseFloat(card.dataset.cost || 0);
-      const material = card.querySelector(".material").value;
-      const color = card.querySelector(".color").value;
-      const infill = card.querySelector(".infill").value;
-      const qty = card.querySelector(".qty").value;
-      
-      total += cost;
-      
-      const item = document.createElement("div");
-      item.className = "checkout-item";
-      item.innerHTML = `
-        <div class="item-details">
-          <div class="item-name">${name}</div>
-          <div class="item-specs">${material} - ${color} - ${infill}% infill - Qty: ${qty}</div>
-        </div>
-        <div class="item-price">$${cost.toFixed(2)}</div>
+    
+    items.forEach(item => {
+      total += item.cost;
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "checkout-item";
+      itemDiv.innerHTML = `
+        <div class="checkout-item-name">${item.name} (${item.qty}x)</div>
+        <div class="checkout-item-details">${item.material} - ${item.weight.toFixed(1)}g</div>
+        <div class="checkout-item-price">$${item.cost.toFixed(2)}</div>
       `;
-      checkoutItems.appendChild(item);
+      checkoutItems.appendChild(itemDiv);
     });
     
     checkoutTotal.textContent = `$${total.toFixed(2)}`;
@@ -728,155 +642,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function processOrder() {
     const placeOrderBtn = document.getElementById("placeOrder");
+    const originalText = placeOrderBtn.innerHTML;
+    
+    // Show loading state
+    placeOrderBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Processing...';
     placeOrderBtn.disabled = true;
-    placeOrderBtn.innerHTML = '<span class="material-icons">hourglass_empty</span> Processing...';
 
     try {
-      // Validate required fields
-      const requiredFields = ['firstName', 'lastName', 'email', 'address', 'city', 'state', 'zipCode'];
-      const missingFields = [];
-      
-      requiredFields.forEach(field => {
-        const input = document.getElementById(field);
-        if (!input.value.trim()) {
-          missingFields.push(field);
-          input.style.borderColor = '#ef4444';
-        } else {
-          input.style.borderColor = '#d1d5db';
-        }
-      });
-
-      if (missingFields.length > 0) {
-        alert('Please fill in all required fields.');
-        placeOrderBtn.disabled = false;
-        placeOrderBtn.innerHTML = '<span class="material-icons">payment</span> Place Order';
-        return;
-      }
-
-      // Collect order data
-      const orderData = {
-        customer: {
-          firstName: document.getElementById('firstName').value,
-          lastName: document.getElementById('lastName').value,
-          email: document.getElementById('email').value,
-          phone: document.getElementById('phone').value
-        },
-        shipping: {
-          address: document.getElementById('address').value,
-          city: document.getElementById('city').value,
-          state: document.getElementById('state').value,
-          zipCode: document.getElementById('zipCode').value,
-          country: document.getElementById('country').value
-        },
-        payment: {
-          method: document.querySelector('input[name="paymentMethod"]:checked').value,
-          cardNumber: document.getElementById('cardNumber').value,
-          expiry: document.getElementById('expiry').value,
-          cvv: document.getElementById('cvv').value,
-          cardName: document.getElementById('cardName').value
-        },
-        items: [],
-        total: 0,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      // Collect items
-      document.querySelectorAll(".part-card").forEach(card => {
-        const name = card.querySelector("h4")?.textContent || "Part";
-        const cost = parseFloat(card.dataset.cost || 0);
-        const material = card.querySelector(".material").value;
-        const color = card.querySelector(".color").value;
-        const infill = card.querySelector(".infill").value;
-        const qty = parseInt(card.querySelector(".qty").value);
-        const volume = parseFloat(card.dataset.totalVolume || 0);
-        
-        orderData.items.push({
-          name,
-          material,
-          color,
-          infill: parseFloat(infill),
-          quantity: qty,
-          volume,
-          unitCost: cost / qty,
-          totalCost: cost
-        });
-        
-        orderData.total += cost;
-      });
-
       // Simulate payment processing
       await simulatePaymentProcessing();
-
+      
       // Generate order number
       const orderNumber = generateOrderNumber();
-      orderData.orderNumber = orderNumber;
+      document.getElementById("orderNumber").textContent = `Order #${orderNumber}`;
       
-      // Save order to Firestore
-      try {
-        if (window.FirebaseDB && window.FirebaseAuth) {
-          const { db, collection, addDoc } = window.FirebaseDB;
-          const { auth } = window.FirebaseAuth;
-          
-          // Add user ID if logged in
-          if (auth.currentUser) {
-            orderData.userId = auth.currentUser.uid;
-            orderData.userEmail = auth.currentUser.email;
-          }
-          
-          const orderRef = await addDoc(collection(db, 'orders'), orderData);
-          console.log('Order saved to Firestore with ID:', orderRef.id);
-        }
-      } catch (firestoreError) {
-        console.error('Error saving to Firestore:', firestoreError);
-        // Continue with order processing even if Firestore fails
-      }
-
-      // Send order to backend API
-      try {
-        const response = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderData)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('Order sent to backend:', result);
-      } catch (apiError) {
-        console.error('Error sending order to backend:', apiError);
-        // Continue even if backend fails - order is already saved to Firestore
-      }
-      
-      // Show success modal
-      document.getElementById('orderNumber').textContent = `Order #${orderNumber}`;
-      checkoutModal.style.display = "none";
+      // Close checkout modal and show success
+      closeCheckoutModal();
       successModal.style.display = "flex";
-
-      console.log('Order placed successfully:', orderData);
-
+      
+      // Clear cart after successful order
+      clearCart();
+      
     } catch (error) {
-      console.error('Error processing order:', error);
-      alert('There was an error processing your order. Please try again.');
+      console.error("Order processing failed:", error);
+      alert("There was an error processing your order. Please try again.");
     } finally {
+      // Restore button state
+      placeOrderBtn.innerHTML = originalText;
       placeOrderBtn.disabled = false;
-      placeOrderBtn.innerHTML = '<span class="material-icons">payment</span> Place Order';
     }
   }
 
   function simulatePaymentProcessing() {
     return new Promise((resolve) => {
-      setTimeout(() => {
-        // Simulate random success/failure (90% success rate for demo)
-        if (Math.random() > 0.1) {
-          resolve();
-        } else {
-          throw new Error('Payment failed');
-        }
-      }, 2000);
+      setTimeout(resolve, 2000); // Simulate 2-second processing time
     });
   }
 
@@ -887,7 +686,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearCart() {
-    // Remove all part cards
     document.querySelectorAll(".part-card").forEach(card => card.remove());
     updateSummary();
   }

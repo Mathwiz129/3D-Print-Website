@@ -22,47 +22,46 @@ CORS(app)  # Allows cross-origin requests from your frontend
 # Get price multiplier from environment variable, default to 1.0 for local development
 PRICE_MULTIPLIER = float(os.environ.get('PRICE_MULTIPLIER', '1.0'))
 
+# STL Weight Estimator API configuration
+STL_API_URL = "https://stl-api-66l8.onrender.com/estimate-weight"
+
 # Initialize Firebase Admin SDK (if not already done)
 if not firebase_admin._apps:
     try:
         # Try to use environment variable (for Render deployment)
         firebase_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        print("GOOGLE_APPLICATION_CREDENTIALS:", firebase_creds)
         
         if firebase_creds and os.path.exists(firebase_creds):
-            print("File exists:", os.path.exists(firebase_creds))
-            with open(firebase_creds) as f:
-                print("First 100 chars of file:", f.read(100))
             cred = credentials.Certificate(firebase_creds)
             firebase_admin.initialize_app(cred)
-            print("Firebase initialized with environment credentials")
+            print("Firebase: Environment credentials")
         else:
             # Fall back to file (for local development)
             local_creds_file = "outprint-3d-printing-firebase-adminsdk-fbsvc-bee53169f9.json"
             if os.path.exists(local_creds_file):
                 cred = credentials.Certificate(local_creds_file)
                 firebase_admin.initialize_app(cred)
-                print("Firebase initialized with local credentials file")
+                print("Firebase: Local credentials")
             else:
-                print("No Firebase credentials found, running without database")
+                print("Firebase: No credentials found")
                 firebase_admin.initialize_app()
     except Exception as e:
-        print(f"Firebase initialization error: {e}")
+        print(f"Firebase init error: {e}")
         # Continue without Firebase for now
         db = None
     else:
         try:
             db = firestore.client()
-            print("Firestore client created successfully")
+            print("Firebase: Connected")
         except Exception as e:
-            print(f"Firestore client creation failed: {e}")
+            print(f"Firebase client error: {e}")
             db = None
 else:
     try:
         db = firestore.client()
-        print("Using existing Firebase app")
+        print("Firebase: Using existing app")
     except Exception as e:
-        print(f"Firestore client creation failed: {e}")
+        print(f"Firebase client error: {e}")
         db = None
 
 # Serve main pages
@@ -116,11 +115,21 @@ def health_check():
         meshlab_available = False
         meshlab_version = "Not installed"
     
+    # Check external STL API status
+    stl_api_status = "unknown"
+    try:
+        response = requests.get("https://stl-api-66l8.onrender.com/health", timeout=5)
+        stl_api_status = "healthy" if response.status_code == 200 else "unhealthy"
+    except:
+        stl_api_status = "unreachable"
+    
     return jsonify({
         'status': 'healthy',
         'firebase_connected': db is not None,
         'meshlab_available': meshlab_available,
         'meshlab_version': meshlab_version,
+        'stl_api_status': stl_api_status,
+        'stl_api_url': STL_API_URL,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -167,10 +176,7 @@ def test_database():
 def calculate_volume_with_trimesh(stl_file_path, units='mm'):
     try:
         mesh = trimesh.load(stl_file_path)
-        print(f"Mesh extents: {mesh.extents}")
-        print(f"Mesh bounding box: {mesh.bounding_box.extents}")
         if not mesh.is_watertight:
-            print("Mesh is not watertight, attempting to fill holes...")
             mesh = mesh.fill_holes()
         volume = mesh.volume  # in mm³ if STL is in mm
 
@@ -187,58 +193,34 @@ def calculate_volume_with_trimesh(stl_file_path, units='mm'):
 
         return volume_cm3
     except Exception as e:
-        print(f"Trimesh calculation failed: {e}")
+        print(f"Trimesh volume calc failed: {e}")
         return None
 
 def calculate_wall_and_infill_volume(stl_file_path, infill=0.2, wall_thickness_mm=1.2, layer_height_mm=0.2, top_bottom_layers=3, perimeters=2, density=1.24, units='mm'):
-    print(f"=== STL Volume Calculation Debug ===")
-    print(f"Loading STL file: {stl_file_path}")
-    print(f"Expected units: {units}")
-    
     mesh = trimesh.load(stl_file_path)
-    print(f"Mesh loaded successfully")
-    print(f"Mesh bounds: {mesh.bounds}")
-    print(f"Mesh extents: {mesh.extents}")
-    print(f"Mesh extents (mm): {mesh.extents}")
-    print(f"Mesh extents (cm): {mesh.extents / 10.0}")
-    print(f"Expected cube size: 100mm = 10cm")
-    print(f"Actual cube size from mesh: {max(mesh.extents)}mm = {max(mesh.extents) / 10.0}cm")
     
     if not mesh.is_watertight:
-        print("Mesh was not watertight, filling holes...")
         mesh = mesh.fill_holes()
     
     total_volume_mm3 = abs(mesh.volume)
     surface_area_mm2 = mesh.area
     
-    print(f"=== Volume Calculation Results ===")
-    print(f"Raw mesh volume: {mesh.volume}")
-    print(f"Total volume (mm³): {total_volume_mm3}")
-    print(f"Total volume (cm³): {total_volume_mm3 / 1000.0}")
-    print(f"Expected volume for 10cm cube: 1000 cm³")
-    print(f"Expected volume for 100mm cube: 1,000,000 mm³")
-    print(f"Surface area (mm²): {surface_area_mm2}")
-    print(f"Expected surface area for 10cm cube: 600 cm² = 60,000 mm²")
-    print(f"Wall thickness (mm): {wall_thickness_mm}")
-    print(f"Layer height (mm): {layer_height_mm}")
-    print(f"Top/bottom layers: {top_bottom_layers}")
-    print(f"Perimeters: {perimeters}")
-    
-    # More accurate calculation based on typical 3D printing parameters
-    # This accounts for multiple perimeters, top/bottom layers, and proper infill
-    
-    # Estimate the part dimensions for better calculations
+    # Calculate expected volume from bounding box
     extents = mesh.extents
-    max_dimension = max(extents)
-    min_dimension = min(extents)
+    expected_volume_mm3 = extents[0] * extents[1] * extents[2]
     
-    # Calculate shell volume more accurately using actual printing parameters
-    # Wall volume = surface area × perimeter thickness × perimeters
-    perimeter_thickness = 0.6  # Each perimeter is 0.6mm wide
-    wall_volume_mm3 = surface_area_mm2 * perimeter_thickness * perimeters
+    # Calculate shell volume more realistically
+    cube_side_length = max(extents)  # Assuming it's roughly cubic
+    perimeter_length = 4 * cube_side_length  # Perimeter of one layer
+    wall_height = cube_side_length  # Height of the walls
     
-    # Top/bottom layers volume
-    top_bottom_volume_mm3 = surface_area_mm2 * layer_height_mm * top_bottom_layers
+    # Wall volume = perimeter × wall height × wall thickness × perimeters
+    wall_thickness_mm = 0.6  # Each perimeter is 0.6mm wide
+    wall_volume_mm3 = perimeter_length * wall_height * wall_thickness_mm * perimeters
+    
+    # Top/bottom layers volume (only the top and bottom faces)
+    top_bottom_area_mm2 = cube_side_length * cube_side_length  # Area of one face
+    top_bottom_volume_mm3 = top_bottom_area_mm2 * layer_height_mm * top_bottom_layers * 2  # Top and bottom
     
     # Total shell volume
     shell_volume_mm3 = wall_volume_mm3 + top_bottom_volume_mm3
@@ -257,25 +239,12 @@ def calculate_wall_and_infill_volume(stl_file_path, infill=0.2, wall_thickness_m
     total_volume_cm3 = total_volume_mm3 / 1000.0
     material_volume_cm3 = material_volume_mm3 / 1000.0
     
-    print(f"=== Final CM³ Values ===")
-    print(f"Total volume: {total_volume_cm3} cm³")
-    print(f"Wall volume: {wall_volume_mm3 / 1000.0} cm³")
-    print(f"Top/bottom volume: {top_bottom_volume_mm3 / 1000.0} cm³")
-    print(f"Shell volume (100% infill): {shell_volume_cm3} cm³")
-    print(f"Inner volume: {inner_volume_cm3} cm³")
-    print(f"Infill percentage: {infill * 100}%")
-    print(f"Material volume: {shell_volume_cm3} + ({inner_volume_cm3} × {infill * 100}%) = {material_volume_cm3} cm³")
-    
-    # Calculate weights (no correction factor needed)
+    # Calculate weights
     shell_weight = shell_volume_cm3 * density
     infill_weight = inner_volume_cm3 * infill * density
     total_weight = shell_weight + infill_weight
     
-    print(f"=== Weight Calculation ===")
-    print(f"Shell weight: {shell_weight}g")
-    print(f"Infill weight: {infill_weight}g")
-    print(f"Total weight: {total_weight}g")
-    print(f"=== End Debug ===")
+    print(f"Trimesh: {total_weight:.1f}g, {total_volume_cm3:.1f}cm³")
     
     return {
         'material_volume_cm3': material_volume_cm3,
@@ -287,24 +256,66 @@ def calculate_wall_and_infill_volume(stl_file_path, infill=0.2, wall_thickness_m
         'total_weight': total_weight
     }
 
+def call_stl_weight_api(stl_file_path, infill_percentage, material_density):
+    """
+    Call the external STL Weight Estimator API for accurate weight calculation
+    
+    Args:
+        stl_file_path: Path to the STL file
+        infill_percentage: Infill percentage (0-100)
+        material_density: Material density in g/cm³
+    
+    Returns:
+        float: Weight in grams, or None if failed
+    """
+    try:
+        # Prepare the API request with fixed parameters
+        with open(stl_file_path, 'rb') as stl_file:
+            files = {'file': stl_file}
+            data = {
+                'infill_percentage': infill_percentage,
+                'material_density': material_density,
+                'line_thickness': 0.2,  # Fixed at 0.2mm
+                'layer_height': 0.2,    # Fixed at 0.2mm
+                'shell_count': 2        # Fixed at 2 shells
+            }
+            
+            # Make the API call
+            response = requests.post(STL_API_URL, files=files, data=data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                weight_grams = result.get('weight_grams', 0)
+                print(f"STL API: {weight_grams:.1f}g")
+                return weight_grams
+            else:
+                print(f"STL API failed: {response.status_code}")
+                return None
+                
+    except requests.exceptions.Timeout:
+        print("STL API timeout")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"STL API error: {e}")
+        return None
+    except Exception as e:
+        print(f"STL API unexpected error: {e}")
+        return None
+
 @app.route('/upload-stl', methods=['POST'])
 def upload_stl():
-    print("upload_stl endpoint called")
     try:
         if 'file' not in request.files:
-            print("No file provided in request.files")
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
         if file.filename == '':
-            print("No file selected (empty filename)")
             return jsonify({'error': 'No file selected'}), 400
         
         if not file.filename.lower().endswith('.stl'):
-            print("File is not an STL file:", file.filename)
             return jsonify({'error': 'File must be an STL file'}), 400
         
-        # Get units, infill, wall thickness, density, and correction factor from request (optional)
+        # Get parameters from request
         units = request.form.get('units', 'mm')
         infill = float(request.form.get('infill', 20)) / 100  # Default 20%
         
@@ -314,24 +325,42 @@ def upload_stl():
         elif infill > 1.0:
             infill = 1.0
             
-        wall_thickness = float(request.form.get('wallThickness', 1.2))  # Realistic: 1.2mm (2 perimeters at 0.6mm each)
-        layer_height = float(request.form.get('layerHeight', 0.2))  # Realistic: 0.2mm
-        top_bottom_layers = int(request.form.get('topBottomLayers', 3))  # Realistic: 3 top + 3 bottom layers
-        perimeters = int(request.form.get('perimeters', 2))  # Realistic: 2 perimeters
+        wall_thickness = float(request.form.get('wallThickness', 1.2))
+        layer_height = float(request.form.get('layerHeight', 0.2))
+        top_bottom_layers = int(request.form.get('topBottomLayers', 3))
+        perimeters = int(request.form.get('perimeters', 2))
         density = float(request.form.get('density', 1.24))
-        print(f"Using units: {units}, infill: {infill}, wall_thickness: {wall_thickness}, layer_height: {layer_height}, top_bottom_layers: {top_bottom_layers}, perimeters: {perimeters}, density: {density}")
         
         # Create a temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as temp_file:
             file.save(temp_file.name)
             temp_path = temp_file.name
-        print("Calling calculate_wall_and_infill_volume with:", temp_path)
         
         try:
-            # Use wall+infill volume calculation
-            print("Attempting to load trimesh...")
+            # First, try the external STL Weight Estimator API for accurate weight
+            infill_percentage = infill * 100
+            
+            # Call the external API
+            weight_grams = call_stl_weight_api(
+                stl_file_path=temp_path,
+                infill_percentage=infill_percentage,
+                material_density=density
+            )
+            
+            if weight_grams is not None:
+                # API call successful - return the weight
+                calculation_method = f'External STL API (infill {infill_percentage}%, density {density}g/cm³)'
+                
+                return jsonify({
+                    'success': True,
+                    'weight': weight_grams,
+                    'filename': file.filename,
+                    'calculationMethod': calculation_method,
+                    'apiUsed': True
+                })
+            
+            # Fallback to existing trimesh calculation
             import trimesh
-            print("Trimesh imported successfully")
             
             result = calculate_wall_and_infill_volume(
                 temp_path,
@@ -343,57 +372,38 @@ def upload_stl():
                 density=density,
                 units=units
             )
-            calculation_method = f'Trimesh wall+infill (wall {wall_thickness}mm, infill {infill}, layer {layer_height}mm, top/bottom {top_bottom_layers}, perimeters {perimeters})'
+            calculation_method = f'Trimesh fallback (infill {infill_percentage}%, density {density}g/cm³)'
             
             return jsonify({
                 'success': True,
-                'materialVolume': result['material_volume_cm3'],
-                'totalVolume': result['total_volume_cm3'],
-                'shellVolume': result['shell_volume_cm3'],
-                'innerVolume': result['inner_volume_cm3'],
-                'shellWeight': result['shell_weight'],
-                'infillWeight': result['infill_weight'],
-                'totalWeight': result['total_weight'],
+                'weight': result['total_weight'],
                 'filename': file.filename,
-                'calculationMethod': calculation_method
+                'calculationMethod': calculation_method,
+                'apiUsed': False
             })
         except Exception as e:
-            print("Error in wall+infill volume calculation:", str(e))
-            import traceback
-            traceback.print_exc()
-            
-            # Better fallback: try to load the mesh and get basic volume info
+            # Emergency fallback
             try:
-                print("Attempting fallback volume calculation...")
                 mesh = trimesh.load(temp_path)
                 if mesh.is_watertight:
                     total_volume_mm3 = abs(mesh.volume)
                     total_volume_cm3 = total_volume_mm3 / 1000.0
-                    print(f"Fallback: Using basic trimesh volume: {total_volume_cm3} cm³")
                 else:
-                    # If mesh is not watertight, estimate from bounding box
                     extents = mesh.extents
                     estimated_volume_cm3 = (extents[0] * extents[1] * extents[2]) / 1000.0
-                    print(f"Fallback: Using bounding box estimation: {estimated_volume_cm3} cm³")
                     total_volume_cm3 = estimated_volume_cm3
             except Exception as fallback_error:
-                print(f"Fallback calculation also failed: {fallback_error}")
-                # Last resort: use a reasonable default for a typical small part
-                total_volume_cm3 = 10.0  # 10 cm³ as a reasonable default
-                print(f"Using default volume: {total_volume_cm3} cm³")
+                total_volume_cm3 = 10.0
+            
+            emergency_weight = total_volume_cm3 * 0.3 * density
             
             return jsonify({
                 'success': True,
-                'materialVolume': total_volume_cm3 * 0.3,  # Assume 30% material usage
-                'totalVolume': total_volume_cm3,
-                'shellVolume': total_volume_cm3 * 0.1,  # Assume 10% shell
-                'innerVolume': total_volume_cm3 * 0.9,  # Assume 90% inner
-                'shellWeight': total_volume_cm3 * 0.1 * 1.24,  # Assume PLA density
-                'infillWeight': total_volume_cm3 * 0.9 * infill * 1.24,
-                'totalWeight': total_volume_cm3 * 0.3 * 1.24,
+                'weight': emergency_weight,
                 'filename': file.filename,
-                'calculationMethod': f'Fallback estimation (trimesh failed: {str(e)[:100]})',
-                'warning': 'Volume calculation failed, using fallback estimation'
+                'calculationMethod': 'Emergency estimation',
+                'warning': 'Volume calculation failed, using fallback estimation',
+                'apiUsed': False
             })
         finally:
             # Clean up temporary file
@@ -402,32 +412,23 @@ def upload_stl():
             except:
                 pass
     except Exception as e:
-        print("Error in upload_stl:", str(e))
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/calculate', methods=['POST'])
 def calculate_cost():
     try:
-        print("=== /calculate endpoint called ===")
         data = request.get_json()
-        print(f"Request data: {data}")
-        # Add detailed logging for all key variables
+        
+        # Get parameters
         material = data.get('material')
         color = data.get('color')
-        total_volume = float(data.get('totalVolume', 0))  # cm³
-        infill = float(data.get('infill', 20)) / 100
-        wall_thickness = float(data.get('wallThickness', 1.2))
-        layer_height = float(data.get('layerHeight', 0.2))
-        top_bottom_layers = int(data.get('topBottomLayers', 3))
-        perimeters = int(data.get('perimeters', 2))
-        print(f"material: {material}, color: {color}, total_volume: {total_volume}, infill: {infill}, wall_thickness: {wall_thickness}, layer_height: {layer_height}, top_bottom_layers: {top_bottom_layers}, perimeters: {perimeters}")
-        if not material or total_volume <= 0:
-            print("Missing material or invalid volume")
-            return jsonify({'error': 'Missing material or invalid volume'}), 400
+        weight_grams = float(data.get('weight', 0))  # Weight in grams from STL API
+        
+        if not material or weight_grams <= 0:
+            return jsonify({'error': 'Missing material or invalid weight'}), 400
 
         # Get material data from database
         if db is None:
-            print("Database not available")
             return jsonify({'error': 'Database not available'}), 500
 
         try:
@@ -438,7 +439,6 @@ def calculate_cost():
                 material_data = doc.to_dict()
                 break
             if not material_data:
-                print(f"Material '{material}' not found in database")
                 return jsonify({'error': f'Material "{material}" not found in database'}), 404
 
             price_per_gram = float(material_data.get('price', 0.05))
@@ -446,84 +446,25 @@ def calculate_cost():
                 for color_data in material_data['colors']:
                     if color_data.get('hex') == color:
                         price_per_gram = float(color_data.get('price', material_data.get('price', 0.05)))
-                        print(f"Using color-specific price for {color}: {price_per_gram}")
                         break
-            density = float(material_data.get('density', 1.24))
         except Exception as db_error:
-            print(f"Database query error: {db_error}")
             return jsonify({'error': 'Database query failed'}), 500
 
-        # Robust slicer-style calculation
-        # Estimate surface area for shell calculation (approximate as cube root for non-cube shapes)
-        # For best accuracy, this should come from STL, but we use total_volume as input for now
-        # Assume a cube for surface area estimation: surface_area = 6 * (side^2), side = (volume)^(1/3)
-        side = total_volume ** (1/3)
-        surface_area = 6 * (side ** 2)
-        
-        # Much more realistic shell calculation - use much smaller values
-        perimeter_thickness = 0.4  # 0.4mm per perimeter (typical nozzle width)
-        wall_volume = surface_area * perimeter_thickness * perimeters
-        top_bottom_volume = surface_area * layer_height * top_bottom_layers
-        
-        # Cap shell volume to a very small percentage of total volume (max 15%)
-        shell_volume = wall_volume + top_bottom_volume
-        max_shell_percentage = 0.15  # Maximum 15% of total volume for shell
-        max_shell_volume = total_volume * max_shell_percentage
-        shell_volume = min(shell_volume, max_shell_volume)
-        
-        inner_volume = max(0, total_volume - shell_volume)
-        material_volume = shell_volume + (inner_volume * infill)
-        weight_grams = material_volume * density
-   
+        # Calculate cost: weight × price per gram × multiplier
         cost = weight_grams * price_per_gram * PRICE_MULTIPLIER
 
-        print(f"=== Slicer-Style Calculation ===")
-        print(f"Total volume: {total_volume} cm³")
-        print(f"Surface area (approx): {surface_area} cm²")
-        print(f"Perimeter thickness: {perimeter_thickness}mm")
-        print(f"Wall volume: {wall_volume} cm³")
-        print(f"Top/bottom volume: {top_bottom_volume} cm³")
-        print(f"Raw shell volume: {wall_volume + top_bottom_volume} cm³")
-        print(f"Max shell volume (15%): {max_shell_volume} cm³")
-        print(f"Final shell volume: {shell_volume} cm³")
-        print(f"Inner volume: {inner_volume} cm³")
-        print(f"Infill percentage received: {infill * 100}%")
-        print(f"Material volume calculation: {shell_volume} + ({inner_volume} × {infill * 100}%) = {material_volume} cm³")
-        print(f"Weight: {weight_grams}g")
-        print(f"Price per gram: ${price_per_gram}")
-        print(f"Price multiplier: {PRICE_MULTIPLIER}")
-        print(f"Cost: ${cost}")
-        
-        # Simple test to verify infill impact
-        test_20_percent = shell_volume + (inner_volume * 0.2)
-        test_50_percent = shell_volume + (inner_volume * 0.5)
-        test_80_percent = shell_volume + (inner_volume * 0.8)
-        print(f"TEST - Material volume at 20% infill: {test_20_percent} cm³")
-        print(f"TEST - Material volume at 50% infill: {test_50_percent} cm³")
-        print(f"TEST - Material volume at 80% infill: {test_80_percent} cm³")
-        print(f"TEST - Current infill material volume: {material_volume} cm³")
-        print(f"=== End Calculation Debug ===")
+        print(f"Cost calc: {weight_grams:.1f}g × ${price_per_gram:.4f} = ${cost:.2f}")
 
         return jsonify({
             'cost': round(cost, 2),
             'breakdown': {
-                'totalVolume': round(total_volume, 2),
-                'materialVolume': round(material_volume, 2),
                 'weight': round(weight_grams, 2),
-                'density': density,
                 'pricePerGram': round(price_per_gram, 4),
-                'infill': infill,
-                'wallVolume': round(wall_volume, 2),
-                'topBottomVolume': round(top_bottom_volume, 2),
-                'shellVolume': round(shell_volume, 2),
-                'innerVolume': round(inner_volume, 2),
-                'calculationMethod': 'Robust slicer-style backend calculation'
+                'priceMultiplier': PRICE_MULTIPLIER,
+                'calculationMethod': 'Weight × Price per gram'
             }
         })
     except Exception as e:
-        print(f"Error calculating cost: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @app.route('/api/submit-printer-application', methods=['POST'])
@@ -777,17 +718,17 @@ def handle_orders():
                         user_orders_ref = db.collection('users').document(order_data['userId']).collection('orders').add(order_data)
                         order_data['userOrderId'] = user_orders_ref[1].id
                     
-                    print(f"Order saved to Firestore: {order_data['orderNumber']}")
+                    print(f"Order saved: {order_data['orderNumber']}")
                     
                 except Exception as e:
-                    print(f"Error saving order to Firestore: {e}")
+                    print(f"Order save error: {e}")
                     # Continue without Firestore if it fails
             
             # Send confirmation email (if email service is configured)
             try:
                 send_order_confirmation_email(order_data)
             except Exception as e:
-                print(f"Error sending confirmation email: {e}")
+                print(f"Email error: {e}")
                 # Continue without email if it fails
             
             return jsonify({
@@ -797,7 +738,7 @@ def handle_orders():
             })
             
         except Exception as e:
-            print(f"Error processing order: {e}")
+            print(f"Order processing error: {e}")
             return jsonify({'error': 'Failed to process order'}), 500
     
     elif request.method == 'GET':
@@ -833,11 +774,11 @@ def handle_orders():
                 })
                 
             except Exception as e:
-                print(f"Error fetching orders from Firestore: {e}")
+                print(f"Order fetch error: {e}")
                 return jsonify({'error': 'Failed to fetch orders'}), 500
                 
         except Exception as e:
-            print(f"Error in get_user_orders: {e}")
+            print(f"Order get error: {e}")
             return jsonify({'error': 'Failed to get orders'}), 500
 
 def generate_order_number():
@@ -868,19 +809,16 @@ def send_order_confirmation_email(order_data):
         """
         
         # For now, just log the email (you can implement actual email sending later)
-        print(f"Would send confirmation email to {customer_email}:")
-        print(f"Subject: {subject}")
-        print(f"Body: {body}")
+        print(f"Email: {customer_email} - {order_number} - ${total:.2f}")
         
     except Exception as e:
-        print(f"Error creating confirmation email: {e}")
+        print(f"Email creation error: {e}")
 
 @app.route('/test-trimesh')
 def test_trimesh():
     """Test endpoint to check if trimesh is working properly"""
     try:
         import trimesh
-        print("Trimesh imported successfully")
         
         # Create a simple test cube
         vertices = [[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0],
@@ -902,12 +840,53 @@ def test_trimesh():
             'extents': mesh.extents.tolist()
         })
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': str(e)
+        }), 500
+
+@app.route('/test-stl-api')
+def test_stl_api():
+    """Test endpoint to check if the external STL Weight Estimator API is working"""
+    try:
+        # Check if we have the test STL file
+        test_stl_path = "100mm cubed.stl"
+        if not os.path.exists(test_stl_path):
+            return jsonify({
+                'success': False,
+                'error': 'Test STL file not found',
+                'message': 'Please ensure "100mm cubed.stl" exists in the project directory'
+            }), 404
+        
+        # Test with the 100mm cube STL file
+        weight_grams = call_stl_weight_api(
+            stl_file_path=test_stl_path,
+            infill_percentage=20,
+            material_density=1.24
+        )
+        
+        if weight_grams is not None:
+            return jsonify({
+                'success': True,
+                'api_working': True,
+                'test_file': test_stl_path,
+                'weight_grams': weight_grams,
+                'expected_weight_g': 1240.0,  # 1000cm³ × 1.24g/cm³ = 1240g
+                'weight_accuracy': f"{abs(weight_grams - 1240.0) / 1240.0 * 100:.2f}% difference"
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'api_working': False,
+                'error': 'External API call failed',
+                'test_file': test_stl_path,
+                'message': 'The external STL Weight Estimator API is not responding'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 if __name__ == '__main__':
